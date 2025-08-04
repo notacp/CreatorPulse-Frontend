@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, AuthResponse } from '@/lib/types';
+import { User } from '@/lib/types';
 import { apiService } from '@/lib/apiService';
 
 interface AuthContextType {
@@ -44,7 +44,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           error: response.error?.message || 'Login failed' 
         };
       }
-    } catch (error) {
+    } catch {
       return { 
         success: false, 
         error: 'Network error. Please try again.' 
@@ -65,7 +65,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           error: response.error?.message || 'Registration failed' 
         };
       }
-    } catch (error) {
+    } catch {
       return { 
         success: false, 
         error: 'Network error. Please try again.' 
@@ -95,7 +95,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           error: response.error?.message || 'Password reset failed' 
         };
       }
-    } catch (error) {
+    } catch {
       return { 
         success: false, 
         error: 'Network error. Please try again.' 

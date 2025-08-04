@@ -153,6 +153,7 @@ class ApiService {
     }
 
     // Simulate password validation (in real app, this would be hashed)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const storedPassword = (user as any).password || 'password123'; // Default for existing mock users
     if (request.password !== storedPassword) {
       await this.delay(200); // Simulate password check delay
@@ -218,6 +219,7 @@ class ApiService {
     };
 
     // Store password for mock authentication (in real app, this would be hashed)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (newUser as any).password = request.password;
 
     this.users.push(newUser);

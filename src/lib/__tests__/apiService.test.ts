@@ -4,7 +4,6 @@
  */
 
 import { apiService } from '../apiService';
-import { mockUsers } from '../mockData';
 
 describe('API Service', () => {
   beforeEach(() => {
@@ -12,12 +11,11 @@ describe('API Service', () => {
     apiService.resetData();
     
     // Disable random error simulation for tests
-    // We'll override the shouldSimulateError method to always return false
-    const originalShouldSimulateError = (apiService as any).shouldSimulateError;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (apiService as any).shouldSimulateError = () => false;
     
     // Also disable specific error scenarios for tests
-    const originalSimulateSpecificErrors = (apiService as any).simulateSpecificErrors;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (apiService as any).simulateSpecificErrors = () => null;
   });
 

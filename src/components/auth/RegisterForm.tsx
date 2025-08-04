@@ -87,7 +87,7 @@ export default function RegisterForm({ onSuccess, redirectTo }: RegisterFormProp
       } else {
         setErrors({ submit: result.error || 'Registration failed' });
       }
-    } catch (error) {
+    } catch {
       setErrors({ submit: 'An unexpected error occurred' });
     } finally {
       setIsLoading(false);

@@ -30,7 +30,7 @@ export default function EmailVerification({ token }: EmailVerificationProps) {
           setStatus('error');
           setMessage(response.error?.message || 'Email verification failed');
         }
-      } catch (error) {
+      } catch {
         setStatus('error');
         setMessage('An unexpected error occurred during verification');
       }
