@@ -153,7 +153,8 @@ class ApiService {
     }
 
     // Simulate password validation (in real app, this would be hashed)
-    if (request.password !== 'password123') {
+    const storedPassword = (user as any).password || 'password123'; // Default for existing mock users
+    if (request.password !== storedPassword) {
       await this.delay(200); // Simulate password check delay
       return this.createErrorResponse('auth_error', 'Invalid email or password');
     }
@@ -169,6 +170,19 @@ class ApiService {
 
     this.currentUser = user;
     this.authToken = token;
+
+    // Persist authentication state
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('creatorpulse_auth', JSON.stringify({
+          user,
+          token,
+          expiresAt
+        }));
+      } catch (error) {
+        console.error('Error storing auth in localStorage:', error);
+      }
+    }
 
     return this.createSuccessResponse({
       user,
@@ -203,6 +217,9 @@ class ApiService {
       created_at: getCurrentTimestamp()
     };
 
+    // Store password for mock authentication (in real app, this would be hashed)
+    (newUser as any).password = request.password;
+
     this.users.push(newUser);
 
     // Generate mock JWT token
@@ -211,6 +228,19 @@ class ApiService {
 
     this.currentUser = newUser;
     this.authToken = token;
+
+    // Persist authentication state
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('creatorpulse_auth', JSON.stringify({
+          user: newUser,
+          token,
+          expiresAt
+        }));
+      } catch (error) {
+        console.error('Error storing auth in localStorage:', error);
+      }
+    }
 
     return this.createSuccessResponse({
       user: newUser,
@@ -226,8 +256,7 @@ class ApiService {
   async logout(): Promise<ApiResponse<{ message: string }>> {
     await this.delay(200);
 
-    this.currentUser = null;
-    this.authToken = null;
+    this.clearAuthState();
 
     return this.createSuccessResponse({ message: 'Logged out successfully' });
   }
@@ -862,14 +891,49 @@ class ApiService {
    * Get current authenticated user
    */
   getCurrentUser(): User | null {
-    return this.currentUser;
+    // Check in-memory first
+    if (this.currentUser) {
+      return this.currentUser;
+    }
+
+    // Check localStorage for persistence
+    if (typeof window !== 'undefined') {
+      try {
+        const storedAuth = localStorage.getItem('creatorpulse_auth');
+        if (storedAuth) {
+          const { user, token, expiresAt } = JSON.parse(storedAuth);
+          
+          // Check if token is still valid
+          if (new Date(expiresAt) > new Date()) {
+            this.currentUser = user;
+            this.authToken = token;
+            return user;
+          } else {
+            // Token expired, clear storage
+            localStorage.removeItem('creatorpulse_auth');
+          }
+        }
+      } catch (error) {
+        console.error('Error reading auth from localStorage:', error);
+        localStorage.removeItem('creatorpulse_auth');
+      }
+    }
+
+    return null;
   }
 
   /**
    * Check if user is authenticated
    */
   isAuthenticated(): boolean {
-    return this.currentUser !== null && this.authToken !== null;
+    // Check current state first
+    if (this.currentUser !== null && this.authToken !== null) {
+      return true;
+    }
+
+    // Check if we can restore from localStorage
+    const user = this.getCurrentUser();
+    return user !== null;
   }
 
   /**
@@ -886,6 +950,11 @@ class ApiService {
   clearAuthState(): void {
     this.currentUser = null;
     this.authToken = null;
+    
+    // Clear persisted state
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('creatorpulse_auth');
+    }
   }
 
   /**

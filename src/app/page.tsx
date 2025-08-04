@@ -1,6 +1,58 @@
+'use client';
+
+import Link from 'next/link';
+import { useAuth } from '@/contexts/AuthContext';
+
 export default function Home() {
+  const { isAuthenticated, user, logout } = useAuth();
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
+      {/* Navigation */}
+      <nav className="container mx-auto px-4 py-6">
+        <div className="flex justify-between items-center">
+          <div className="text-2xl font-bold text-gray-900 dark:text-white">
+            CreatorPulse
+          </div>
+          <div className="flex items-center gap-4">
+            {isAuthenticated ? (
+              <>
+                <span className="text-gray-600 dark:text-gray-300">
+                  Welcome, {user?.email}
+                </span>
+                <Link
+                  href="/dashboard"
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+                >
+                  Dashboard
+                </Link>
+                <button
+                  onClick={logout}
+                  className="text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white font-semibold py-2 px-4 transition-colors"
+                >
+                  Sign Out
+                </button>
+              </>
+            ) : (
+              <>
+                <Link
+                  href="/auth/login"
+                  className="text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white font-semibold py-2 px-4 transition-colors"
+                >
+                  Sign In
+                </Link>
+                <Link
+                  href="/auth/register"
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+                >
+                  Get Started
+                </Link>
+              </>
+            )}
+          </div>
+        </div>
+      </nav>
+
       <div className="container mx-auto px-4 py-16">
         <div className="text-center">
           <h1 className="text-5xl font-bold text-gray-900 dark:text-white mb-6">
@@ -11,12 +63,29 @@ export default function Home() {
             AI-powered LinkedIn post drafts delivered to your inbox.
           </p>
           <div className="flex gap-4 justify-center">
-            <button className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors">
-              Get Started
-            </button>
-            <button className="border border-gray-300 hover:border-gray-400 text-gray-700 dark:text-gray-300 font-semibold py-3 px-6 rounded-lg transition-colors">
-              Learn More
-            </button>
+            {isAuthenticated ? (
+              <Link
+                href="/dashboard"
+                className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors"
+              >
+                Go to Dashboard
+              </Link>
+            ) : (
+              <>
+                <Link
+                  href="/auth/register"
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors"
+                >
+                  Get Started
+                </Link>
+                <Link
+                  href="/auth/login"
+                  className="border border-gray-300 hover:border-gray-400 text-gray-700 dark:text-gray-300 font-semibold py-3 px-6 rounded-lg transition-colors"
+                >
+                  Sign In
+                </Link>
+              </>
+            )}
           </div>
         </div>
 
