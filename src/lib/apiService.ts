@@ -947,6 +947,20 @@ class ApiService {
   }
 
   /**
+   * Get mock data (for development/testing)
+   */
+  getMockData() {
+    return {
+      users: this.users,
+      sources: this.sources,
+      stylePosts: this.stylePosts,
+      drafts: this.drafts,
+      feedback: this.feedback,
+      sourceContent: this.sourceContent
+    };
+  }
+
+  /**
    * Clear authentication state
    */
   clearAuthState(): void {
@@ -970,20 +984,6 @@ class ApiService {
     this.feedback = [...mockFeedback];
     this.sourceContent = [...mockSourceContent];
     this.clearAuthState();
-  }
-
-  /**
-   * Get mock data for testing
-   */
-  getMockData() {
-    return {
-      users: this.users,
-      sources: this.sources,
-      stylePosts: this.stylePosts,
-      drafts: this.drafts,
-      feedback: this.feedback,
-      sourceContent: this.sourceContent
-    };
   }
 
   /**
