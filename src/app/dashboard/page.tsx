@@ -1,8 +1,20 @@
+'use client';
+
+import { useState } from 'react';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import Navigation from '@/components/layout/Navigation';
+import { DraftsList, GenerateDrafts } from '@/components/drafts';
+import DashboardStats from '@/components/dashboard/DashboardStats';
 import Link from 'next/link';
 
 export default function DashboardPage() {
+  const [refreshDrafts, setRefreshDrafts] = useState(0);
+
+  const handleDraftsGenerated = () => {
+    // Trigger refresh of drafts list
+    setRefreshDrafts(prev => prev + 1);
+  };
+
   const quickActions = [
     {
       title: 'Style Training',
@@ -21,18 +33,18 @@ export default function DashboardPage() {
       href: '/sources',
       icon: (
         <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
         </svg>
       ),
       color: 'bg-blue-600 hover:bg-blue-700'
     },
     {
-      title: 'Generate Drafts',
-      description: 'Create new LinkedIn post drafts based on your sources and style',
-      href: '#',
+      title: 'Draft History',
+      description: 'View all your generated drafts and manage feedback',
+      href: '/drafts',
       icon: (
         <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
         </svg>
       ),
       color: 'bg-green-600 hover:bg-green-700'
@@ -40,7 +52,7 @@ export default function DashboardPage() {
     {
       title: 'Settings',
       description: 'Update your preferences, timezone, and account settings',
-      href: '#',
+      href: '/settings',
       icon: (
         <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -88,47 +100,27 @@ export default function DashboardPage() {
             ))}
           </div>
 
-          {/* Recent Activity */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-                Recent Drafts
-              </h2>
-              <div className="text-center py-8">
-                <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                  No drafts generated yet
-                </p>
-                <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-                  Complete your style training to start generating drafts
-                </p>
-              </div>
+          {/* Draft Generation */}
+          <div className="mb-8">
+            <GenerateDrafts onDraftsGenerated={handleDraftsGenerated} />
+          </div>
+
+          {/* Main Content */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Recent Drafts - Takes up 2 columns */}
+            <div className="lg:col-span-2">
+              <DraftsList 
+                key={refreshDrafts} // Force refresh when drafts are generated
+                limit={5} 
+                showPagination={false} 
+                showFilters={false}
+                title="Recent Drafts (Last 7 Days)"
+              />
             </div>
 
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-                Quick Stats
-              </h2>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600 dark:text-gray-400">Active Sources</span>
-                  <span className="font-semibold text-gray-900 dark:text-white">0</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600 dark:text-gray-400">Style Posts</span>
-                  <span className="font-semibold text-gray-900 dark:text-white">0</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600 dark:text-gray-400">Total Drafts</span>
-                  <span className="font-semibold text-gray-900 dark:text-white">0</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600 dark:text-gray-400">Feedback Rate</span>
-                  <span className="font-semibold text-gray-900 dark:text-white">0%</span>
-                </div>
-              </div>
+            {/* Stats Sidebar */}
+            <div className="lg:col-span-1">
+              <DashboardStats />
             </div>
           </div>
         </div>

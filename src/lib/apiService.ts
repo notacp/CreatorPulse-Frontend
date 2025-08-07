@@ -439,8 +439,72 @@ class ApiService {
   // ==================== STYLE TRAINING ENDPOINTS ====================
 
   /**
+   * POST /style/posts/add
+   * Add individual style training posts (allows incremental addition)
+   */
+  async addStylePost(content: string): Promise<ApiResponse<{ message: string; post_id: string }>> {
+    const authError = this.requireAuth();
+    if (authError) return authError;
+
+    await this.delay(500); // Shorter delay for individual posts
+
+    // Validate post content
+    if (!content || typeof content !== 'string') {
+      return this.createErrorResponse('validation_error', 'Post content is required');
+    }
+
+    const trimmedContent = content.trim();
+    if (trimmedContent.length < 50) {
+      return this.createErrorResponse('validation_error', 'Post must be at least 50 characters long');
+    }
+
+    if (trimmedContent.length > 3000) {
+      return this.createErrorResponse('validation_error', 'Post must be less than 3000 characters');
+    }
+
+    // Check if user already has too many posts
+    const userStylePosts = this.stylePosts.filter(sp => sp.user_id === this.currentUser!.id);
+    if (userStylePosts.length >= 100) {
+      return this.createErrorResponse('validation_error', 'Maximum 100 posts allowed per user');
+    }
+
+    if (this.shouldSimulateError(0.02)) { // 2% error rate for individual posts
+      return this.createErrorResponse('server_error', 'Failed to save post. Please try again.');
+    }
+
+    // Create new style post
+    const newPost = {
+      id: generateId(),
+      user_id: this.currentUser!.id,
+      content: trimmedContent,
+      processed: false,
+      created_at: getCurrentTimestamp(),
+      word_count: trimmedContent.split(/\s+/).length
+    };
+
+    this.stylePosts.push(newPost);
+
+    // Simulate processing after a short delay
+    setTimeout(() => {
+      const postIndex = this.stylePosts.findIndex(sp => sp.id === newPost.id);
+      if (postIndex !== -1) {
+        this.stylePosts[postIndex] = {
+          ...this.stylePosts[postIndex],
+          processed: true,
+          processed_at: getCurrentTimestamp()
+        };
+      }
+    }, 2000 + Math.random() * 3000); // Process after 2-5 seconds
+
+    return this.createSuccessResponse({
+      message: 'Post added successfully',
+      post_id: newPost.id
+    });
+  }
+
+  /**
    * POST /style/upload
-   * Upload style training posts
+   * Upload multiple style training posts (bulk upload)
    */
   async uploadStylePosts(request: StyleTrainingRequest): Promise<ApiResponse<{ message: string; job_id: string }>> {
     const authError = this.requireAuth();
@@ -453,8 +517,8 @@ class ApiService {
       return this.createErrorResponse('validation_error', 'Posts array is required');
     }
 
-    if (request.posts.length < 10) {
-      return this.createErrorResponse('validation_error', 'Minimum 10 posts required for effective style training');
+    if (request.posts.length === 0) {
+      return this.createErrorResponse('validation_error', 'At least one post is required');
     }
 
     if (request.posts.length > 100) {
@@ -470,6 +534,12 @@ class ApiService {
       return this.createErrorResponse('validation_error', 'Each post must be between 50 and 3000 characters');
     }
 
+    // Check if user would exceed maximum posts
+    const userStylePosts = this.stylePosts.filter(sp => sp.user_id === this.currentUser!.id);
+    if (userStylePosts.length + request.posts.length > 100) {
+      return this.createErrorResponse('validation_error', 'Upload would exceed maximum of 100 posts per user');
+    }
+
     // Check for specific error scenarios
     const specificError = this.simulateSpecificErrors('upload_style');
     if (specificError) return specificError;
@@ -478,10 +548,7 @@ class ApiService {
       return this.createErrorResponse('server_error', 'Style processing service temporarily unavailable');
     }
 
-    // Remove existing style posts for this user (simulating retraining)
-    this.stylePosts = this.stylePosts.filter(sp => sp.user_id !== this.currentUser!.id);
-
-    // Create style posts with word count
+    // Create style posts with word count (don't remove existing posts for bulk upload)
     const stylePosts = request.posts.map(content => ({
       id: generateId(),
       user_id: this.currentUser!.id,
@@ -522,7 +589,7 @@ class ApiService {
     }, 1000); // Start processing after 1 second
 
     return this.createSuccessResponse({
-      message: `Style training started with ${request.posts.length} posts`,
+      message: `Successfully uploaded ${request.posts.length} posts`,
       job_id: jobId
     });
   }
@@ -677,30 +744,65 @@ class ApiService {
     const draftsToGenerate = Math.floor(Math.random() * 3) + 3; // 3-5 drafts
     const newDrafts: Draft[] = [];
 
-    const draftTemplates = [
-      '🚀 Just came across an interesting development in {topic}. {insight}\n\nThis reminds me of when I {personal_experience}.\n\nWhat\'s your take on {question}?',
-      '💡 Hot take: {opinion}\n\nHere\'s why I think this matters:\n→ {reason1}\n→ {reason2}\n→ {reason3}\n\nAm I missing something here?',
-      '📈 {achievement_or_milestone}\n\nKey lessons learned:\n• {lesson1}\n• {lesson2}\n• {lesson3}\n\nWhat\'s been your biggest {related_topic} challenge?',
-      '🔥 Unpopular opinion: {controversial_statement}\n\n{supporting_argument}\n\nI\'ve seen this play out in {example}.\n\nChange my mind - what am I getting wrong?',
-      '⚡ Quick tip that {benefit}:\n\n{specific_tip}\n\nSometimes the simplest solutions are the most effective.\n\nWhat\'s your favorite {category} hack?'
+    const mockDraftContents = [
+      {
+        content: '🚀 Just discovered an AI startup that raised $50M Series A for developer tools.\n\nWhat caught my attention? They\'re solving real problems developers face daily, not just riding the AI hype wave.\n\nTheir debugging tool claims to reduce development time by 60%. If true, that\'s game-changing.\n\nKey takeaway: Great funding follows great product-market fit, not flashy tech demos.\n\nWhat\'s your take on the current AI tools landscape? Overhyped or undervalued?',
+        source: 'TechCrunch'
+      },
+      {
+        content: '💭 Remote-first isn\'t just a trend anymore - it\'s becoming the competitive advantage.\n\nCompanies still pushing "office-first" mentality are losing top talent to remote-first competitors.\n\nI\'ve seen this shift firsthand:\n→ Global talent pools vs local hiring\n→ Lower overhead vs expensive office leases\n→ Results-focused vs time-focused culture\n\nThe future of work is already here. Some companies just haven\'t realized it yet.\n\nAre you seeing this shift in your industry?',
+        source: 'Elon Musk'
+      },
+      {
+        content: '📈 Building SaaS? Here\'s what I wish someone told me 3 years ago:\n\n✅ Market validation > perfect code\n✅ Your first 100 users teach you more than any business plan\n✅ Iterate fast, but don\'t pivot on every complaint\n✅ Revenue solves most problems (but creates new ones)\n✅ Customer success is your best marketing channel\n\nThe hardest part isn\'t building the product - it\'s finding the right problem to solve.\n\nWhat\'s been your biggest SaaS learning curve?',
+        source: 'Y Combinator Blog'
+      },
+      {
+        content: '🔥 Hot take: The best engineers aren\'t the ones who write the most code.\n\nThey\'re the ones who:\n→ Ask the right questions before coding\n→ Delete more code than they write\n→ Make complex things simple\n→ Help others level up\n→ Know when NOT to build something\n\nTechnical skills get you hired. Everything else determines how far you go.\n\nWhat non-technical skill has helped you most as a developer?',
+        source: null
+      },
+      {
+        content: '⚡ Performance optimization tip that saved us 40% on server costs:\n\nWe were making 3 separate API calls for data that could be fetched in one query.\n\nSometimes the biggest wins come from stepping back and questioning the approach, not just optimizing the implementation.\n\n"Make it work, make it right, make it fast" - but also make sure you\'re solving the right problem first.\n\nWhat\'s your favorite performance optimization story?',
+        source: null
+      },
+      {
+        content: '🎯 Startup milestone: We just hit 1,000 active users!\n\nWhat I learned scaling from 0 to 1K:\n\n• Product-market fit > perfect architecture\n• User feedback is your north star\n• Manual processes are okay at first\n• Community building beats paid ads\n• Retention matters more than acquisition\n• Technical debt is real, but so is market timing\n\nNext stop: 10K users. The journey continues!\n\nWhat\'s been your biggest scaling challenge?',
+        source: 'Andreessen Horowitz'
+      },
+      {
+        content: '💡 Today\'s debugging session reminded me why I love programming.\n\nSpent 4 hours chasing a bug that turned out to be a missing environment variable. Frustrating? Absolutely.\n\nBut that moment when everything clicks? Pure magic.\n\nDebugging teaches:\n→ Patience and persistence\n→ Systematic problem-solving\n→ Humility (we all write bugs)\n→ The art of asking better questions\n\nWhat\'s the most ridiculous bug you\'ve spent hours on?',
+        source: null
+      },
+      {
+        content: '🌟 Career advice that changed my trajectory:\n\n"Don\'t just solve problems - understand why they exist."\n\nThis shift from reactive to proactive thinking:\n→ Made me a better engineer\n→ Opened leadership opportunities  \n→ Helped me build better products\n→ Improved my stakeholder relationships\n\nSometimes the best solution is preventing the problem entirely.\n\nWhat advice fundamentally changed your career path?',
+        source: 'Paul Graham'
+      },
+      {
+        content: '🚨 PSA: Your home office setup matters more than you think.\n\nInvested in a good chair and monitor this year. Results:\n→ 30% less back pain\n→ Better focus and productivity\n→ Fewer headaches from eye strain\n→ Actually enjoying long coding sessions\n\nRemote work tip: Treat your workspace like the professional environment it is.\n\nWhat\'s the best WFH investment you\'ve made?',
+        source: null
+      },
+      {
+        content: '📊 Data point that surprised me: 70% of successful SaaS founders spend more time talking to customers than coding.\n\nThis used to frustrate me as a technical founder. "I should be building!"\n\nThen I realized: Building the wrong thing perfectly is worse than building the right thing imperfectly.\n\nCustomer conversations aren\'t a distraction from building - they\'re the foundation of building right.\n\nHow do you balance building vs. customer research?',
+        source: 'Y Combinator Blog'
+      }
     ];
 
     for (let i = 0; i < draftsToGenerate; i++) {
-      const template = draftTemplates[Math.floor(Math.random() * draftTemplates.length)];
+      const mockContent = mockDraftContents[Math.floor(Math.random() * mockDraftContents.length)];
       const sourceContent = availableContent[Math.floor(Math.random() * Math.max(1, availableContent.length))];
       
       const draft: Draft = {
         id: generateId(),
         user_id: this.currentUser!.id,
-        content: template.replace(/\{[^}]+\}/g, 'AI-generated content based on your style'),
+        content: mockContent.content,
         source_content_id: sourceContent?.id || null,
         status: 'pending',
         feedback_token: `feedback-${generateId()}`,
         email_sent_at: null,
         created_at: getCurrentTimestamp(),
         updated_at: getCurrentTimestamp(),
-        source_name: sourceContent ? userSources.find(s => s.id === sourceContent.source_id)?.name : undefined,
-        character_count: Math.floor(Math.random() * 200) + 300, // 300-500 chars
+        source_name: mockContent.source || (sourceContent ? userSources.find(s => s.id === sourceContent.source_id)?.name : undefined),
+        character_count: mockContent.content.length,
         engagement_score: Math.round((Math.random() * 3 + 7) * 10) / 10 // 7.0-10.0
       };
       newDrafts.push(draft);

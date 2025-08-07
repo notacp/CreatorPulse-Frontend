@@ -69,12 +69,15 @@ export default function StyleTrainingInterface() {
     setStylePosts(prev => [...prev, newPost]);
     setCurrentPost('');
 
-    // Upload to API
+    // Upload to API using the new addStylePost method
     try {
-      const response = await apiService.uploadStylePosts({ posts: [currentPost.trim()] });
+      const response = await apiService.addStylePost(currentPost.trim());
       if (response.success) {
         // Refresh the data to get the real post with proper ID
         await loadStyleData();
+        // Show success message
+        setErrors({ success: 'Post added successfully!' });
+        setTimeout(() => setErrors({}), 2000);
       } else {
         // Remove the temporary post if upload failed
         setStylePosts(prev => prev.filter(p => p.id !== newPost.id));
@@ -277,6 +280,24 @@ export default function StyleTrainingInterface() {
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
           Add New Posts
         </h2>
+
+        {/* Training Status Warning */}
+        {stylePosts.length < 10 && (
+          <div className="mb-4 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-md p-4">
+            <div className="flex">
+              <svg className="h-5 w-5 text-orange-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+              <div className="ml-3">
+                <p className="text-sm text-orange-800 dark:text-orange-200">
+                  <strong>Minimum 10 posts required for effective style training</strong>
+                  <br />
+                  You currently have {stylePosts.length} posts. Add {10 - stylePosts.length} more to enable draft generation.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Error/Success Messages */}
         {errors.success && (

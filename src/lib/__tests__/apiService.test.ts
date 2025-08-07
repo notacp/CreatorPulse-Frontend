@@ -126,7 +126,7 @@ describe('API Service', () => {
       }
 
       expect(result.success).toBe(true);
-      expect(result.data?.message).toContain('Style training started');
+      expect(result.data?.message).toContain('Successfully uploaded');
       expect(result.data?.job_id).toBeDefined();
     });
 
@@ -145,6 +145,26 @@ describe('API Service', () => {
       expect(result.success).toBe(true);
       expect(result.data?.status).toBeDefined();
       expect(typeof result.data?.progress).toBe('number');
+    });
+
+    test('should add individual style post', async () => {
+      const postContent = 'This is a test LinkedIn post that is definitely longer than 50 characters and should be accepted by the API validation.';
+
+      const result = await apiService.addStylePost(postContent);
+
+      expect(result.success).toBe(true);
+      expect(result.data?.message).toBe('Post added successfully');
+      expect(result.data?.post_id).toBeDefined();
+    });
+
+    test('should fail to add post that is too short', async () => {
+      const shortPost = 'Too short';
+
+      const result = await apiService.addStylePost(shortPost);
+
+      expect(result.success).toBe(false);
+      expect(result.error?.error).toBe('validation_error');
+      expect(result.error?.message).toContain('at least 50 characters');
     });
   });
 

@@ -7,4 +7,10 @@ export { default as PasswordResetForm } from './auth/PasswordResetForm';
 export { default as EmailVerification } from './auth/EmailVerification';
 export { default as ProtectedRoute, withAuth } from './auth/ProtectedRoute';
 
+// Draft Components
+export * from './drafts';
+
+// Dashboard Components
+export { default as DashboardStats } from './dashboard/DashboardStats';
+
 // export * from './ui'; // Uncomment when UI components are added
