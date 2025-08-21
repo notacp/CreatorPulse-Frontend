@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface LoginFormProps {
@@ -11,6 +12,7 @@ interface LoginFormProps {
 
 export default function LoginForm({ onSuccess, redirectTo }: LoginFormProps) {
   const { login } = useAuth();
+  const router = useRouter();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -53,7 +55,8 @@ export default function LoginForm({ onSuccess, redirectTo }: LoginFormProps) {
       if (result.success) {
         onSuccess?.();
         if (redirectTo) {
-          window.location.href = redirectTo;
+          // Use Next.js router for navigation instead of window.location
+          router.push(redirectTo);
         }
       } else {
         setErrors({ submit: result.error || 'Login failed' });

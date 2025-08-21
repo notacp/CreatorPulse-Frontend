@@ -20,11 +20,14 @@ export default function ProtectedRoute({
   const router = useRouter();
 
   useEffect(() => {
+    console.log('ProtectedRoute: effect', { isLoading, isAuthenticated, requireAuth, redirectTo });
     if (!isLoading) {
       if (requireAuth && !isAuthenticated) {
+        console.log('ProtectedRoute: redirecting to', redirectTo);
         router.push(redirectTo);
       } else if (!requireAuth && isAuthenticated) {
         // Redirect authenticated users away from auth pages
+        console.log('ProtectedRoute: redirecting to dashboard');
         router.push('/dashboard');
       }
     }

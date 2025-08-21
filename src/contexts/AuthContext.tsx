@@ -24,6 +24,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Check for existing auth state on mount
     const checkAuthState = () => {
       const currentUser = apiService.getCurrentUser();
+      const isAuth = apiService.isAuthenticated();
+      console.log('AuthContext: checkAuthState', { currentUser, isAuth });
       setUser(currentUser);
       setIsLoading(false);
     };
@@ -37,6 +39,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       if (response.success && response.data) {
         setUser(response.data.user);
+        
+        // Force a re-check of authentication state
+        setTimeout(() => {
+          const currentUser = apiService.getCurrentUser();
+          if (currentUser) {
+            setUser(currentUser);
+          }
+        }, 100);
+        
         return { success: true };
       } else {
         return { 
@@ -80,6 +91,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('Logout error:', error);
     } finally {
       setUser(null);
+      // Clear localStorage
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('creatorpulse_auth');
+      }
     }
   };
 
@@ -103,9 +118,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const isAuthenticated = !!user && apiService.isAuthenticated();
+  console.log('AuthContext: render state', { user: !!user, isAuthenticated, isLoading });
+
   const value: AuthContextType = {
     user,
-    isAuthenticated: !!user,
+    isAuthenticated,
     isLoading,
     login,
     register,
