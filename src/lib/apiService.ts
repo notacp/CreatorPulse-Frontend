@@ -157,10 +157,13 @@ class ApiService {
 
       const authData = await response.json();
       
-      // Extract user and token from backend response
-      const user = authData.user;
-      const token = authData.access_token || authData.token;
-      const expiresAt = authData.expires_at || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      // Extract user and token from backend response structure
+      console.log('Login response:', authData);
+      const user = authData.data?.user;
+      const token = authData.data?.token || authData.data?.access_token;
+      const expiresAt = authData.data?.expires_at || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+      console.log('Extracted auth data:', { user: !!user, token: !!token, expiresAt });
 
       this.currentUser = user;
       this.authToken = token;
@@ -247,10 +250,10 @@ class ApiService {
 
       const authData = await response.json();
       
-      // Extract user and token from backend response
-      const user = authData.user;
-      const token = authData.access_token || authData.token;
-      const expiresAt = authData.expires_at || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      // Extract user and token from backend response structure
+      const user = authData.data?.user;
+      const token = authData.data?.token || authData.data?.access_token;
+      const expiresAt = authData.data?.expires_at || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
       this.currentUser = user;
       this.authToken = token;
