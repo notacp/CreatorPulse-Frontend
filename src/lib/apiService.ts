@@ -131,66 +131,89 @@ class ApiService {
    * Authenticate user with email and password
    */
   async login(request: LoginRequest): Promise<ApiResponse<AuthResponse>> {
-    await this.delay(800); // Simulate auth delay
+    try {
+      // Make real API call to backend
+      const response = await fetch(`${this.API_BASE_URL}/v1/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(request)
+      });
 
-    // Check for specific error scenarios
-    const specificError = this.simulateSpecificErrors('login');
-    if (specificError) return specificError;
-
-    if (this.shouldSimulateError(0.03)) { // 3% error rate for auth
-      return this.createErrorResponse('server_error', 'Authentication service temporarily unavailable');
-    }
-
-    // Validate input
-    if (!request.email || !request.password) {
-      return this.createErrorResponse('validation_error', 'Email and password are required');
-    }
-
-    const user = this.users.find(u => u.email === request.email);
-    
-    if (!user) {
-      await this.delay(200); // Simulate password check delay even for non-existent users
-      return this.createErrorResponse('auth_error', 'Invalid email or password');
-    }
-
-    // Simulate password validation (in real app, this would be hashed)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const storedPassword = (user as any).password || 'password123'; // Default for existing mock users
-    if (request.password !== storedPassword) {
-      await this.delay(200); // Simulate password check delay
-      return this.createErrorResponse('auth_error', 'Invalid email or password');
-    }
-
-    // Check if user account is active
-    if (!user.active) {
-      return this.createErrorResponse('auth_error', 'Account is deactivated. Please contact support.');
-    }
-
-    // Generate mock JWT token
-    const token = `mock-jwt-token-${user.id}-${Date.now()}`;
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24 hours
-
-    this.currentUser = user;
-    this.authToken = token;
-
-    // Persist authentication state
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem('creatorpulse_auth', JSON.stringify({
-          user,
-          token,
-          expiresAt
-        }));
-      } catch (error) {
-        console.error('Error storing auth in localStorage:', error);
+      if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          return this.createErrorResponse('auth_error', 'Invalid email or password');
+        }
+        if (response.status === 422) {
+          const errorData = await response.json();
+          return this.createErrorResponse('validation_error', errorData.detail || 'Invalid input');
+        }
+        if (response.status === 429) {
+          return this.createErrorResponse('rate_limit_error', 'Too many login attempts. Please try again later.');
+        }
+        throw new Error(`Login failed with status: ${response.status}`);
       }
-    }
 
-    return this.createSuccessResponse({
-      user,
-      token,
-      expires_at: expiresAt
-    });
+      const authData = await response.json();
+      
+      // Extract user and token from backend response
+      const user = authData.user;
+      const token = authData.access_token || authData.token;
+      const expiresAt = authData.expires_at || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+      this.currentUser = user;
+      this.authToken = token;
+
+      // Persist authentication state
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('creatorpulse_auth', JSON.stringify({
+            user,
+            token,
+            expiresAt
+          }));
+        } catch (error) {
+          console.error('Error storing auth in localStorage:', error);
+        }
+      }
+
+      return this.createSuccessResponse({
+        user,
+        token,
+        expires_at: expiresAt
+      });
+
+    } catch (error) {
+      console.error('Login API error:', error);
+      
+      // Fallback to mock functionality for development
+      await this.delay(800);
+
+      // Validate input
+      if (!request.email || !request.password) {
+        return this.createErrorResponse('validation_error', 'Email and password are required');
+      }
+
+      const user = this.users.find(u => u.email === request.email);
+      
+      if (!user) {
+        return this.createErrorResponse('auth_error', 'Invalid email or password');
+      }
+
+      // Generate mock JWT token for fallback
+      const token = `mock-jwt-token-${user.id}-${Date.now()}`;
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+      this.currentUser = user;
+      this.authToken = token;
+
+      return this.createSuccessResponse({
+        user,
+        token,
+        expires_at: expiresAt
+      });
+    }
   }
 
   /**
@@ -198,58 +221,95 @@ class ApiService {
    * Register new user account
    */
   async register(request: RegisterRequest): Promise<ApiResponse<AuthResponse>> {
-    await this.delay(1000); // Simulate registration delay
+    try {
+      // Make real API call to backend
+      const response = await fetch(`${this.API_BASE_URL}/v1/auth/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(request)
+      });
 
-    if (this.shouldSimulateError()) {
-      return this.createErrorResponse('server_error', 'Registration failed');
-    }
-
-    // Check if email already exists
-    if (this.users.find(u => u.email === request.email)) {
-      return this.createErrorResponse('validation_error', 'Email already registered');
-    }
-
-    // Create new user
-    const newUser: User = {
-      id: generateId(),
-      email: request.email,
-      timezone: request.timezone || 'UTC',
-      delivery_time: '08:00:00',
-      active: true,
-      created_at: getCurrentTimestamp()
-    };
-
-    // Store password for mock authentication (in real app, this would be hashed)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (newUser as any).password = request.password;
-
-    this.users.push(newUser);
-
-    // Generate mock JWT token
-    const token = `mock-jwt-token-${newUser.id}-${Date.now()}`;
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-
-    this.currentUser = newUser;
-    this.authToken = token;
-
-    // Persist authentication state
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem('creatorpulse_auth', JSON.stringify({
-          user: newUser,
-          token,
-          expiresAt
-        }));
-      } catch (error) {
-        console.error('Error storing auth in localStorage:', error);
+      if (!response.ok) {
+        if (response.status === 409) {
+          return this.createErrorResponse('validation_error', 'Email already registered');
+        }
+        if (response.status === 422) {
+          const errorData = await response.json();
+          return this.createErrorResponse('validation_error', errorData.detail || 'Invalid input');
+        }
+        if (response.status === 429) {
+          return this.createErrorResponse('rate_limit_error', 'Too many registration attempts. Please try again later.');
+        }
+        throw new Error(`Registration failed with status: ${response.status}`);
       }
-    }
 
-    return this.createSuccessResponse({
-      user: newUser,
-      token,
-      expires_at: expiresAt
-    });
+      const authData = await response.json();
+      
+      // Extract user and token from backend response
+      const user = authData.user;
+      const token = authData.access_token || authData.token;
+      const expiresAt = authData.expires_at || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+      this.currentUser = user;
+      this.authToken = token;
+
+      // Persist authentication state
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('creatorpulse_auth', JSON.stringify({
+            user,
+            token,
+            expiresAt
+          }));
+        } catch (error) {
+          console.error('Error storing auth in localStorage:', error);
+        }
+      }
+
+      return this.createSuccessResponse({
+        user,
+        token,
+        expires_at: expiresAt
+      });
+
+    } catch (error) {
+      console.error('Registration API error:', error);
+      
+      // Fallback to mock functionality for development
+      await this.delay(1000);
+
+      // Check if email already exists in mock data
+      if (this.users.find(u => u.email === request.email)) {
+        return this.createErrorResponse('validation_error', 'Email already registered');
+      }
+
+      // Create new user for fallback
+      const newUser: User = {
+        id: generateId(),
+        email: request.email,
+        timezone: request.timezone || 'UTC',
+        delivery_time: '08:00:00',
+        active: true,
+        created_at: getCurrentTimestamp()
+      };
+
+      this.users.push(newUser);
+
+      // Generate mock JWT token for fallback
+      const token = `mock-jwt-token-${newUser.id}-${Date.now()}`;
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+      this.currentUser = newUser;
+      this.authToken = token;
+
+      return this.createSuccessResponse({
+        user: newUser,
+        token,
+        expires_at: expiresAt
+      });
+    }
   }
 
   /**
@@ -315,14 +375,36 @@ class ApiService {
     const authError = this.requireAuth();
     if (authError) return authError;
 
-    await this.delay(300);
+    try {
+      // Make real API call to backend
+      const response = await fetch(`${this.API_BASE_URL}/v1/sources`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.authToken}`
+        }
+      });
 
-    if (this.shouldSimulateError()) {
-      return this.createErrorResponse('server_error', 'Failed to fetch sources');
+      if (!response.ok) {
+        if (response.status === 401) {
+          this.clearAuthState();
+          return this.createErrorResponse('authentication_error', 'Authentication required');
+        }
+        throw new Error(`Failed to fetch sources: ${response.status}`);
+      }
+
+      const sources = await response.json();
+      return this.createSuccessResponse(sources);
+
+    } catch (error) {
+      console.error('Sources API error:', error);
+      
+      // Fallback to mock functionality for development
+      await this.delay(300);
+
+      const userSources = this.sources.filter(s => s.user_id === this.currentUser!.id);
+      return this.createSuccessResponse(userSources);
     }
-
-    const userSources = this.sources.filter(s => s.user_id === this.currentUser!.id);
-    return this.createSuccessResponse(userSources);
   }
 
   /**
@@ -333,36 +415,62 @@ class ApiService {
     const authError = this.requireAuth();
     if (authError) return authError;
 
-    await this.delay(600);
+    try {
+      // Make real API call to backend
+      const response = await fetch(`${this.API_BASE_URL}/v1/sources`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.authToken}`
+        },
+        body: JSON.stringify(request)
+      });
 
-    if (this.shouldSimulateError()) {
-      return this.createErrorResponse('server_error', 'Failed to create source');
+      if (!response.ok) {
+        if (response.status === 401) {
+          this.clearAuthState();
+          return this.createErrorResponse('authentication_error', 'Authentication required');
+        }
+        if (response.status === 422) {
+          const errorData = await response.json();
+          return this.createErrorResponse('validation_error', errorData.detail || 'Invalid input');
+        }
+        throw new Error(`Failed to create source: ${response.status}`);
+      }
+
+      const newSource = await response.json();
+      
+      // Update local cache for immediate UI update
+      this.sources.push(newSource);
+      
+      return this.createSuccessResponse(newSource);
+
+    } catch (error) {
+      console.error('Create source API error:', error);
+      
+      // Fallback to mock functionality for development
+      await this.delay(600);
+
+      // Validate URL format
+      if (!request.url.startsWith('http')) {
+        return this.createErrorResponse('validation_error', 'Invalid URL format');
+      }
+
+      const newSource: Source = {
+        id: generateId(),
+        user_id: this.currentUser!.id,
+        type: request.type,
+        url: request.url,
+        name: request.name,
+        active: true,
+        last_checked: null,
+        error_count: 0,
+        created_at: getCurrentTimestamp()
+      };
+
+      this.sources.push(newSource);
+      return this.createSuccessResponse(newSource);
     }
-
-    // Validate URL format
-    if (!request.url.startsWith('http')) {
-      return this.createErrorResponse('validation_error', 'Invalid URL format');
-    }
-
-    // Simulate RSS feed validation
-    if (request.type === 'rss' && request.url.includes('invalid-feed')) {
-      return this.createErrorResponse('validation_error', 'RSS feed is not accessible');
-    }
-
-    const newSource: Source = {
-      id: generateId(),
-      user_id: this.currentUser!.id,
-      type: request.type,
-      url: request.url,
-      name: request.name,
-      active: true,
-      last_checked: null,
-      error_count: 0,
-      created_at: getCurrentTimestamp()
-    };
-
-    this.sources.push(newSource);
-    return this.createSuccessResponse(newSource);
   }
 
   /**
@@ -665,25 +773,57 @@ class ApiService {
     const authError = this.requireAuth();
     if (authError) return authError;
 
-    await this.delay(400);
+    try {
+      // Make real API call to backend
+      const response = await fetch(`${this.API_BASE_URL}/v1/drafts?page=${page}&per_page=${perPage}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.authToken}`
+        }
+      });
 
-    const userDrafts = this.drafts
-      .filter(d => d.user_id === this.currentUser!.id)
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      if (!response.ok) {
+        if (response.status === 401) {
+          this.clearAuthState();
+          return this.createErrorResponse('authentication_error', 'Authentication required');
+        }
+        throw new Error(`Failed to fetch drafts: ${response.status}`);
+      }
 
-    const total = userDrafts.length;
-    const totalPages = Math.ceil(total / perPage);
-    const startIndex = (page - 1) * perPage;
-    const endIndex = startIndex + perPage;
-    const paginatedDrafts = userDrafts.slice(startIndex, endIndex);
+      const result = await response.json();
+      
+      // Update local cache
+      if (result.data) {
+        this.drafts = [...result.data];
+      }
+      
+      return this.createSuccessResponse(result);
 
-    return this.createSuccessResponse({
-      data: paginatedDrafts,
-      total,
-      page,
-      per_page: perPage,
-      total_pages: totalPages
-    });
+    } catch (error) {
+      console.error('Get drafts API error:', error);
+      
+      // Fallback to mock functionality for development
+      await this.delay(400);
+
+      const userDrafts = this.drafts
+        .filter(d => d.user_id === this.currentUser!.id)
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+      const total = userDrafts.length;
+      const totalPages = Math.ceil(total / perPage);
+      const startIndex = (page - 1) * perPage;
+      const endIndex = startIndex + perPage;
+      const paginatedDrafts = userDrafts.slice(startIndex, endIndex);
+
+      return this.createSuccessResponse({
+        data: paginatedDrafts,
+        total,
+        page,
+        per_page: perPage,
+        total_pages: totalPages
+      });
+    }
   }
 
   /**
@@ -694,135 +834,89 @@ class ApiService {
     const authError = this.requireAuth();
     if (authError) return authError;
 
-    await this.delay(2500); // Longer delay for AI generation
-
-    // Check for specific error scenarios
-    const specificError = this.simulateSpecificErrors('generate_drafts');
-    if (specificError) return specificError;
-
-    if (this.shouldSimulateError(0.08)) { // 8% error rate for AI operations
-      return this.createErrorResponse('server_error', 'Draft generation failed due to AI service timeout');
-    }
-
-    // Check if user has sources
-    const userSources = this.sources.filter(s => s.user_id === this.currentUser!.id && s.active);
-    if (userSources.length === 0) {
-      return this.createErrorResponse('validation_error', 'No active sources found. Please add sources first.');
-    }
-
-    // Check if user has style training
-    const userStylePosts = this.stylePosts.filter(sp => sp.user_id === this.currentUser!.id && sp.processed);
-    if (userStylePosts.length < 10) {
-      return this.createErrorResponse('validation_error', 'Insufficient style training. Please upload at least 10 sample posts.');
-    }
-
-    // Check for recent drafts (unless forced)
-    if (!request.force) {
-      const recentDrafts = this.drafts.filter(d => {
-        const draftTime = new Date(d.created_at).getTime();
-        const sixHoursAgo = Date.now() - (6 * 60 * 60 * 1000);
-        return d.user_id === this.currentUser!.id && draftTime > sixHoursAgo;
+    try {
+      // Make real API call to backend
+      const response = await fetch(`${this.API_BASE_URL}/v1/drafts/generate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.authToken}`
+        },
+        body: JSON.stringify(request)
       });
 
-      if (recentDrafts.length >= 5) {
-        return this.createErrorResponse('validation_error', 'You already have recent drafts. Use force=true to generate anyway.');
+      if (!response.ok) {
+        if (response.status === 401) {
+          this.clearAuthState();
+          return this.createErrorResponse('authentication_error', 'Authentication required');
+        }
+        if (response.status === 422) {
+          const errorData = await response.json();
+          return this.createErrorResponse('validation_error', errorData.detail || 'Invalid input');
+        }
+        if (response.status === 429) {
+          return this.createErrorResponse('rate_limit_error', 'Rate limit exceeded. Please try again later.');
+        }
+        throw new Error(`Failed to generate drafts: ${response.status}`);
       }
-    }
 
-    // Simulate checking for new content
-    const availableContent = this.sourceContent.filter(sc => 
-      userSources.some(us => us.id === sc.source_id) && !sc.processed
-    );
-
-    if (availableContent.length === 0 && !request.force) {
-      return this.createSuccessResponse({
-        message: 'No new content available from your sources',
-        drafts_generated: 0
-      });
-    }
-
-    // Generate 3-5 new drafts with realistic content
-    const draftsToGenerate = Math.floor(Math.random() * 3) + 3; // 3-5 drafts
-    const newDrafts: Draft[] = [];
-
-    const mockDraftContents = [
-      {
-        content: '🚀 Just discovered an AI startup that raised $50M Series A for developer tools.\n\nWhat caught my attention? They\'re solving real problems developers face daily, not just riding the AI hype wave.\n\nTheir debugging tool claims to reduce development time by 60%. If true, that\'s game-changing.\n\nKey takeaway: Great funding follows great product-market fit, not flashy tech demos.\n\nWhat\'s your take on the current AI tools landscape? Overhyped or undervalued?',
-        source: 'TechCrunch'
-      },
-      {
-        content: '💭 Remote-first isn\'t just a trend anymore - it\'s becoming the competitive advantage.\n\nCompanies still pushing "office-first" mentality are losing top talent to remote-first competitors.\n\nI\'ve seen this shift firsthand:\n→ Global talent pools vs local hiring\n→ Lower overhead vs expensive office leases\n→ Results-focused vs time-focused culture\n\nThe future of work is already here. Some companies just haven\'t realized it yet.\n\nAre you seeing this shift in your industry?',
-        source: 'Elon Musk'
-      },
-      {
-        content: '📈 Building SaaS? Here\'s what I wish someone told me 3 years ago:\n\n✅ Market validation > perfect code\n✅ Your first 100 users teach you more than any business plan\n✅ Iterate fast, but don\'t pivot on every complaint\n✅ Revenue solves most problems (but creates new ones)\n✅ Customer success is your best marketing channel\n\nThe hardest part isn\'t building the product - it\'s finding the right problem to solve.\n\nWhat\'s been your biggest SaaS learning curve?',
-        source: 'Y Combinator Blog'
-      },
-      {
-        content: '🔥 Hot take: The best engineers aren\'t the ones who write the most code.\n\nThey\'re the ones who:\n→ Ask the right questions before coding\n→ Delete more code than they write\n→ Make complex things simple\n→ Help others level up\n→ Know when NOT to build something\n\nTechnical skills get you hired. Everything else determines how far you go.\n\nWhat non-technical skill has helped you most as a developer?',
-        source: null
-      },
-      {
-        content: '⚡ Performance optimization tip that saved us 40% on server costs:\n\nWe were making 3 separate API calls for data that could be fetched in one query.\n\nSometimes the biggest wins come from stepping back and questioning the approach, not just optimizing the implementation.\n\n"Make it work, make it right, make it fast" - but also make sure you\'re solving the right problem first.\n\nWhat\'s your favorite performance optimization story?',
-        source: null
-      },
-      {
-        content: '🎯 Startup milestone: We just hit 1,000 active users!\n\nWhat I learned scaling from 0 to 1K:\n\n• Product-market fit > perfect architecture\n• User feedback is your north star\n• Manual processes are okay at first\n• Community building beats paid ads\n• Retention matters more than acquisition\n• Technical debt is real, but so is market timing\n\nNext stop: 10K users. The journey continues!\n\nWhat\'s been your biggest scaling challenge?',
-        source: 'Andreessen Horowitz'
-      },
-      {
-        content: '💡 Today\'s debugging session reminded me why I love programming.\n\nSpent 4 hours chasing a bug that turned out to be a missing environment variable. Frustrating? Absolutely.\n\nBut that moment when everything clicks? Pure magic.\n\nDebugging teaches:\n→ Patience and persistence\n→ Systematic problem-solving\n→ Humility (we all write bugs)\n→ The art of asking better questions\n\nWhat\'s the most ridiculous bug you\'ve spent hours on?',
-        source: null
-      },
-      {
-        content: '🌟 Career advice that changed my trajectory:\n\n"Don\'t just solve problems - understand why they exist."\n\nThis shift from reactive to proactive thinking:\n→ Made me a better engineer\n→ Opened leadership opportunities  \n→ Helped me build better products\n→ Improved my stakeholder relationships\n\nSometimes the best solution is preventing the problem entirely.\n\nWhat advice fundamentally changed your career path?',
-        source: 'Paul Graham'
-      },
-      {
-        content: '🚨 PSA: Your home office setup matters more than you think.\n\nInvested in a good chair and monitor this year. Results:\n→ 30% less back pain\n→ Better focus and productivity\n→ Fewer headaches from eye strain\n→ Actually enjoying long coding sessions\n\nRemote work tip: Treat your workspace like the professional environment it is.\n\nWhat\'s the best WFH investment you\'ve made?',
-        source: null
-      },
-      {
-        content: '📊 Data point that surprised me: 70% of successful SaaS founders spend more time talking to customers than coding.\n\nThis used to frustrate me as a technical founder. "I should be building!"\n\nThen I realized: Building the wrong thing perfectly is worse than building the right thing imperfectly.\n\nCustomer conversations aren\'t a distraction from building - they\'re the foundation of building right.\n\nHow do you balance building vs. customer research?',
-        source: 'Y Combinator Blog'
-      }
-    ];
-
-    for (let i = 0; i < draftsToGenerate; i++) {
-      const mockContent = mockDraftContents[Math.floor(Math.random() * mockDraftContents.length)];
-      const sourceContent = availableContent[Math.floor(Math.random() * Math.max(1, availableContent.length))];
+      const result = await response.json();
       
-      const draft: Draft = {
-        id: generateId(),
-        user_id: this.currentUser!.id,
-        content: mockContent.content,
-        source_content_id: sourceContent?.id || null,
-        status: 'pending',
-        feedback_token: `feedback-${generateId()}`,
-        email_sent_at: null,
-        created_at: getCurrentTimestamp(),
-        updated_at: getCurrentTimestamp(),
-        source_name: mockContent.source || (sourceContent ? userSources.find(s => s.id === sourceContent.source_id)?.name : undefined),
-        character_count: mockContent.content.length,
-        engagement_score: Math.round((Math.random() * 3 + 7) * 10) / 10 // 7.0-10.0
-      };
-      newDrafts.push(draft);
-    }
+      // Refresh drafts cache after generation
+      this.getDrafts(1, 10).then(draftsResponse => {
+        if (draftsResponse.success && draftsResponse.data) {
+          // Update local cache with new drafts
+          const newDrafts = draftsResponse.data.data || [];
+          this.drafts = [...this.drafts, ...newDrafts];
+        }
+      });
+      
+      return this.createSuccessResponse({
+        message: result.message || 'Drafts generated successfully',
+        drafts_generated: result.drafts_generated || 0
+      });
 
-    this.drafts.push(...newDrafts);
+    } catch (error) {
+      console.error('Generate drafts API error:', error);
+      
+      // Fallback to mock functionality for development
+      await this.delay(2500);
 
-    // Mark content as processed
-    availableContent.forEach(content => {
-      const contentIndex = this.sourceContent.findIndex(sc => sc.id === content.id);
-      if (contentIndex !== -1) {
-        this.sourceContent[contentIndex].processed = true;
+      // Check if user has sources (basic validation)
+      const userSources = this.sources.filter(s => s.user_id === this.currentUser!.id && s.active);
+      if (userSources.length === 0) {
+        return this.createErrorResponse('validation_error', 'No active sources found. Please add sources first.');
       }
-    });
 
-    return this.createSuccessResponse({
-      message: `Generated ${draftsToGenerate} new drafts based on your recent sources`,
-      drafts_generated: draftsToGenerate
-    });
+      // Generate 3-5 mock drafts
+      const draftsToGenerate = Math.floor(Math.random() * 3) + 3;
+      const mockContent = '🚀 This is a generated draft from mock data. Your real backend will generate personalized content based on your sources and writing style.';
+      
+      const newDrafts: Draft[] = [];
+      for (let i = 0; i < draftsToGenerate; i++) {
+        const draft: Draft = {
+          id: generateId(),
+          user_id: this.currentUser!.id,
+          content: mockContent,
+          source_content_id: null,
+          status: 'pending',
+          feedback_token: `feedback-${generateId()}`,
+          email_sent_at: null,
+          created_at: getCurrentTimestamp(),
+          updated_at: getCurrentTimestamp(),
+          character_count: mockContent.length,
+          engagement_score: Math.round((Math.random() * 3 + 7) * 10) / 10
+        };
+        newDrafts.push(draft);
+      }
+
+      this.drafts.push(...newDrafts);
+
+      return this.createSuccessResponse({
+        message: `Generated ${draftsToGenerate} mock drafts (backend unavailable)`,
+        drafts_generated: draftsToGenerate
+      });
+    }
   }
 
   /**
