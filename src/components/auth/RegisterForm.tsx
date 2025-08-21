@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface RegisterFormProps {
@@ -26,6 +27,7 @@ const timezones = [
 
 export default function RegisterForm({ onSuccess, redirectTo }: RegisterFormProps) {
   const { register } = useAuth();
+  const router = useRouter();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -82,7 +84,7 @@ export default function RegisterForm({ onSuccess, redirectTo }: RegisterFormProp
       if (result.success) {
         onSuccess?.();
         if (redirectTo) {
-          window.location.href = redirectTo;
+          router.push(redirectTo);
         }
       } else {
         setErrors({ submit: result.error || 'Registration failed' });
