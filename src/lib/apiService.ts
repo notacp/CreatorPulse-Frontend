@@ -159,11 +159,20 @@ class ApiService {
       
       // Extract user and token from backend response structure
       console.log('Login response:', authData);
-      const user = authData.data?.user;
-      const token = authData.data?.token || authData.data?.access_token;
-      const expiresAt = authData.data?.expires_at || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      
+      if (!authData.data) {
+        throw new Error('Invalid response format: missing data field');
+      }
+      
+      const user = authData.data.user;
+      const token = authData.data.token || authData.data.access_token;
+      const expiresAt = authData.data.expires_at || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
       console.log('Extracted auth data:', { user: !!user, token: !!token, expiresAt });
+
+      if (!user || !token) {
+        throw new Error('Invalid response: missing user or token');
+      }
 
       this.currentUser = user;
       this.authToken = token;
@@ -251,9 +260,19 @@ class ApiService {
       const authData = await response.json();
       
       // Extract user and token from backend response structure
-      const user = authData.data?.user;
-      const token = authData.data?.token || authData.data?.access_token;
-      const expiresAt = authData.data?.expires_at || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      console.log('Register response:', authData);
+      
+      if (!authData.data) {
+        throw new Error('Invalid response format: missing data field');
+      }
+      
+      const user = authData.data.user;
+      const token = authData.data.token || authData.data.access_token;
+      const expiresAt = authData.data.expires_at || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      
+      if (!user || !token) {
+        throw new Error('Invalid response: missing user or token');
+      }
 
       this.currentUser = user;
       this.authToken = token;
