@@ -1,0 +1,332 @@
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { useRouter } from 'next/navigation';
+import LoginForm from '../../components/auth/LoginForm';
+import RegisterForm from '../../components/auth/RegisterForm';
+import ProtectedRoute from '../../components/auth/ProtectedRoute';
+import { apiService } from '../../lib/apiService';
+
+// Mock the router
+jest.mock('next/navigation', () => ({
+  useRouter: jest.fn(),
+}));
+
+// Mock the API service
+jest.mock('../../lib/apiService', () => ({
+  apiService: {
+    login: jest.fn(),
+    register: jest.fn(),
+    isAuthenticated: jest.fn(),
+    getCurrentUser: jest.fn(),
+    resetData: jest.fn(),
+  },
+}));
+
+// Mock AuthContext
+const mockUseAuth = jest.fn();
+jest.mock('../../contexts/AuthContext', () => ({
+  useAuth: () => mockUseAuth(),
+  AuthProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
+
+const mockPush = jest.fn();
+const mockApiService = apiService as jest.Mocked<typeof apiService>;
+const mockUseRouter = useRouter as jest.MockedFunction<typeof useRouter>;
+
+const TestProtectedComponent = () => <div>Protected Dashboard</div>;
+
+describe('Authentication Flow Integration', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUseRouter.mockReturnValue({
+      push: mockPush,
+      back: jest.fn(),
+      forward: jest.fn(),
+      refresh: jest.fn(),
+      replace: jest.fn(),
+      prefetch: jest.fn(),
+    });
+    mockApiService.resetData.mockImplementation(() => {});
+    
+    // Default auth mock - can be overridden in individual tests
+    mockUseAuth.mockReturnValue({
+      user: null,
+      isAuthenticated: false,
+      isLoading: false,
+      login: jest.fn().mockResolvedValue({ success: true }),
+      register: jest.fn().mockResolvedValue({ success: true }),
+      logout: jest.fn().mockResolvedValue(undefined),
+      resetPassword: jest.fn().mockResolvedValue({ success: true }),
+    });
+  });
+
+  describe('Complete Registration Flow', () => {
+    it('allows user to register and access protected content', async () => {
+      // Mock successful registration
+      mockApiService.register.mockResolvedValue({
+        success: true,
+        data: {
+          user: {
+            id: 'user-1',
+            email: 'newuser@example.com',
+            timezone: 'America/New_York',
+            delivery_time: '08:00:00',
+            active: true,
+            created_at: '2024-01-01T00:00:00Z',
+          },
+          token: 'mock-token',
+          expires_at: '2024-12-31T23:59:59Z',
+        },
+      });
+
+      // Render registration form
+      render(<RegisterForm />);
+
+      // Fill out registration form
+      const emailInput = screen.getByLabelText(/email address/i);
+      const passwordInput = screen.getByLabelText(/^password$/i);
+      const confirmPasswordInput = screen.getByLabelText(/confirm password/i);
+      const timezoneSelect = screen.getByLabelText(/timezone/i);
+      const submitButton = screen.getByRole('button', { name: /create account/i });
+
+      fireEvent.change(emailInput, { target: { value: 'newuser@example.com' } });
+      fireEvent.change(passwordInput, { target: { value: 'password123' } });
+      fireEvent.change(confirmPasswordInput, { target: { value: 'password123' } });
+      fireEvent.change(timezoneSelect, { target: { value: 'America/New_York' } });
+      fireEvent.click(submitButton);
+
+      // Verify registration API call
+      await waitFor(() => {
+        expect(mockApiService.register).toHaveBeenCalledWith({
+          email: 'newuser@example.com',
+          password: 'password123',
+          timezone: 'America/New_York',
+        });
+      });
+
+      // Verify redirect to onboarding
+      await waitFor(() => {
+        expect(mockPush).toHaveBeenCalledWith('/onboarding');
+      });
+    });
+
+    it('handles registration errors gracefully', async () => {
+      // Mock registration failure
+      mockApiService.register.mockResolvedValue({
+        success: false,
+        error: {
+          error: 'validation_error',
+          message: 'Email already registered',
+        },
+      });
+
+      render(<RegisterForm />);
+
+      // Fill out form with existing email
+      const emailInput = screen.getByLabelText(/email address/i);
+      const passwordInput = screen.getByLabelText(/^password$/i);
+      const confirmPasswordInput = screen.getByLabelText(/confirm password/i);
+      const submitButton = screen.getByRole('button', { name: /create account/i });
+
+      fireEvent.change(emailInput, { target: { value: 'existing@example.com' } });
+      fireEvent.change(passwordInput, { target: { value: 'password123' } });
+      fireEvent.change(confirmPasswordInput, { target: { value: 'password123' } });
+      fireEvent.click(submitButton);
+
+      // Verify error is displayed
+      await waitFor(() => {
+        expect(screen.getByText('Email already registered')).toBeInTheDocument();
+      });
+
+      // Verify no redirect occurred
+      expect(mockPush).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Complete Login Flow', () => {
+    it('allows user to login and access protected content', async () => {
+      // Mock successful login
+      const mockUser = {
+        id: 'user-1',
+        email: 'test@example.com',
+        timezone: 'UTC',
+        delivery_time: '08:00:00',
+        active: true,
+        created_at: '2024-01-01T00:00:00Z',
+      };
+
+      mockApiService.login.mockResolvedValue({
+        success: true,
+        data: {
+          user: mockUser,
+          token: 'mock-token',
+          expires_at: '2024-12-31T23:59:59Z',
+        },
+      });
+
+      // Render login form
+      render(<LoginForm />);
+
+      // Fill out login form
+      const emailInput = screen.getByLabelText(/email address/i);
+      const passwordInput = screen.getByLabelText(/password/i);
+      const submitButton = screen.getByRole('button', { name: /sign in/i });
+
+      fireEvent.change(emailInput, { target: { value: 'test@example.com' } });
+      fireEvent.change(passwordInput, { target: { value: 'password123' } });
+      fireEvent.click(submitButton);
+
+      // Verify login API call
+      await waitFor(() => {
+        expect(mockApiService.login).toHaveBeenCalledWith({
+          email: 'test@example.com',
+          password: 'password123',
+        });
+      });
+
+      // Verify redirect to dashboard
+      await waitFor(() => {
+        expect(mockPush).toHaveBeenCalledWith('/dashboard');
+      });
+    });
+
+    it('prevents access to protected content without authentication', () => {
+      // Mock unauthenticated state
+      mockApiService.isAuthenticated.mockReturnValue(false);
+      mockApiService.getCurrentUser.mockReturnValue(null);
+
+      render(
+        <ProtectedRoute>
+          <TestProtectedComponent />
+        </ProtectedRoute>
+      );
+
+      // Should show loading initially
+      expect(screen.getByText(/loading/i)).toBeInTheDocument();
+      
+      // Should not show protected content
+      expect(screen.queryByText('Protected Dashboard')).not.toBeInTheDocument();
+    });
+
+    it('allows access to protected content when authenticated', () => {
+      // Mock authenticated state
+      const mockUser = {
+        id: 'user-1',
+        email: 'test@example.com',
+        timezone: 'UTC',
+        delivery_time: '08:00:00',
+        active: true,
+        created_at: '2024-01-01T00:00:00Z',
+      };
+      
+      mockUseAuth.mockReturnValue({
+        user: mockUser,
+        isAuthenticated: true,
+        isLoading: false,
+        login: jest.fn().mockResolvedValue({ success: true }),
+        register: jest.fn().mockResolvedValue({ success: true }),
+        logout: jest.fn().mockResolvedValue(undefined),
+        resetPassword: jest.fn().mockResolvedValue({ success: true }),
+      });
+
+      render(
+        <ProtectedRoute>
+          <TestProtectedComponent />
+        </ProtectedRoute>
+      );
+
+      // Should show protected content
+      expect(screen.getByText('Protected Dashboard')).toBeInTheDocument();
+    });
+  });
+
+  describe('Authentication State Persistence', () => {
+    it('maintains authentication state across page reloads', () => {
+      const mockUser = {
+        id: 'user-1',
+        email: 'test@example.com',
+        timezone: 'UTC',
+        delivery_time: '08:00:00',
+        active: true,
+        created_at: '2024-01-01T00:00:00Z',
+      };
+
+      // Mock authenticated state
+      mockApiService.isAuthenticated.mockReturnValue(true);
+      mockApiService.getCurrentUser.mockReturnValue(mockUser);
+
+      // First render - user is authenticated
+      const { rerender } = render(
+        <ProtectedRoute>
+          <TestProtectedComponent />
+        </ProtectedRoute>
+      );
+
+      expect(screen.getByText('Protected Dashboard')).toBeInTheDocument();
+
+      // Simulate page reload - authentication should persist
+      rerender(
+        <ProtectedRoute>
+          <TestProtectedComponent />
+        </ProtectedRoute>
+      );
+
+      expect(screen.getByText('Protected Dashboard')).toBeInTheDocument();
+    });
+
+    it('handles expired authentication tokens', () => {
+      // Mock expired authentication
+      mockApiService.isAuthenticated.mockReturnValue(false);
+      mockApiService.getCurrentUser.mockReturnValue(null);
+
+      render(
+        <ProtectedRoute>
+          <TestProtectedComponent />
+        </ProtectedRoute>
+      );
+
+      // Should not show protected content
+      expect(screen.queryByText('Protected Dashboard')).not.toBeInTheDocument();
+      expect(screen.getByText(/loading/i)).toBeInTheDocument();
+    });
+  });
+
+  describe('Form Validation Integration', () => {
+    it('validates all registration fields together', async () => {
+      render(<RegisterForm />);
+
+      const submitButton = screen.getByRole('button', { name: /create account/i });
+      fireEvent.click(submitButton);
+
+      await waitFor(() => {
+        expect(screen.getByText(/email is required/i)).toBeInTheDocument();
+        expect(screen.getByText(/password is required/i)).toBeInTheDocument();
+      });
+
+      // Fill email but leave password empty
+      const emailInput = screen.getByLabelText(/email address/i);
+      fireEvent.change(emailInput, { target: { value: 'test@example.com' } });
+      fireEvent.click(submitButton);
+
+      await waitFor(() => {
+        expect(screen.queryByText(/email is required/i)).not.toBeInTheDocument();
+        expect(screen.getByText(/password is required/i)).toBeInTheDocument();
+      });
+    });
+
+    it('validates password confirmation in registration', async () => {
+      render(<RegisterForm />);
+
+      const passwordInput = screen.getByLabelText(/^password$/i);
+      const confirmPasswordInput = screen.getByLabelText(/confirm password/i);
+      const submitButton = screen.getByRole('button', { name: /create account/i });
+
+      fireEvent.change(passwordInput, { target: { value: 'password123' } });
+      fireEvent.change(confirmPasswordInput, { target: { value: 'different123' } });
+      fireEvent.click(submitButton);
+
+      await waitFor(() => {
+        expect(screen.getByText(/passwords do not match/i)).toBeInTheDocument();
+      });
+    });
+  });
+});

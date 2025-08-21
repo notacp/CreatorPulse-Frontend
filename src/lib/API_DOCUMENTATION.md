@@ -1,12 +1,18 @@
 # CreatorPulse API Documentation
 
-This document describes all API endpoints, request/response formats, and error handling for the CreatorPulse Core MVP.
+This document describes all API endpoints, request/response formats, and error handling for the CreatorPulse Core MVP. This specification serves as the contract between the frontend and backend implementations.
 
 ## Base URL
 ```
 Production: https://api.creatorpulse.com/v1
 Development: http://localhost:8000/v1
 ```
+
+## API Version
+Current version: `v1`
+
+## Content Type
+All requests and responses use `application/json` content type unless otherwise specified.
 
 ## Authentication
 
@@ -254,8 +260,40 @@ Get source health status.
 
 ## Style Training Endpoints
 
+### POST /style/posts/add
+Add individual style training post (allows incremental addition).
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Request:**
+```typescript
+{
+  "content": "Sample LinkedIn post content..."
+}
+```
+
+**Response:**
+```typescript
+{
+  "success": true,
+  "data": {
+    "message": "Post added successfully",
+    "post_id": "post-123"
+  }
+}
+```
+
+**Validation Rules:**
+- Content must be between 50 and 3000 characters
+- Maximum 100 posts per user
+- Content is automatically processed into embeddings
+
+**Errors:**
+- `validation_error`: Content too short/long or user at maximum posts
+- `server_error`: Failed to save post
+
 ### POST /style/upload
-Upload writing samples for style training.
+Upload multiple writing samples for style training (bulk upload).
 
 **Headers:** `Authorization: Bearer <token>`
 
@@ -265,7 +303,7 @@ Upload writing samples for style training.
   "posts": [
     "Sample LinkedIn post 1...",
     "Sample LinkedIn post 2...",
-    // ... minimum 10 posts required
+    // ... minimum 1 post required, maximum 100 per upload
   ]
 }
 ```
@@ -275,14 +313,20 @@ Upload writing samples for style training.
 {
   "success": true,
   "data": {
-    "message": "Style training started",
+    "message": "Successfully uploaded 20 posts",
     "job_id": "style-job-123"
   }
 }
 ```
 
+**Validation Rules:**
+- Each post must be between 50 and 3000 characters
+- Maximum 100 posts per upload
+- Maximum 100 total posts per user
+- Posts are processed asynchronously into vector embeddings
+
 **Errors:**
-- `validation_error`: Minimum 10 posts required
+- `validation_error`: Invalid post content or user at maximum posts
 - `server_error`: Failed to process style posts
 
 ### GET /style/status?job_id=<job_id>
@@ -290,19 +334,28 @@ Get style training status.
 
 **Headers:** `Authorization: Bearer <token>`
 
+**Query Parameters:**
+- `job_id` (optional): Specific job ID to check status for
+
 **Response:**
 ```typescript
 {
   "success": true,
   "data": {
     "status": "pending" | "processing" | "completed" | "failed",
-    "progress": 75, // Percentage complete
+    "progress": 75, // Percentage complete (0-100)
     "total_posts": 20,
     "processed_posts": 15,
     "message": "Processing your writing style..."
   }
 }
 ```
+
+**Status Definitions:**
+- `pending`: Posts uploaded but processing not started
+- `processing`: Currently generating embeddings
+- `completed`: All posts processed successfully
+- `failed`: Processing failed (user should retry)
 
 ### POST /style/retrain
 Retrain style model with existing posts.
@@ -319,6 +372,11 @@ Retrain style model with existing posts.
   }
 }
 ```
+
+**Behavior:**
+- Marks all existing user posts as unprocessed
+- Reprocesses all posts into new embeddings
+- Useful when updating the embedding model or fixing processing issues
 
 ## Draft Management Endpoints
 
@@ -475,6 +533,9 @@ Get dashboard statistics.
 ### POST /feedback/{token}
 Submit feedback via email token (public endpoint).
 
+**URL Parameters:**
+- `token`: Feedback token from email link
+
 **Request:**
 ```typescript
 {
@@ -493,17 +554,74 @@ Submit feedback via email token (public endpoint).
 ```
 
 **Errors:**
-- `not_found`: Invalid feedback token
+- `not_found`: Invalid or expired feedback token
+- `validation_error`: Invalid feedback type
+
+### PUT /drafts/{id}/feedback
+Submit feedback for draft (authenticated endpoint).
+
+**Headers:** `Authorization: Bearer <token>`
+
+**URL Parameters:**
+- `id`: Draft ID
+
+**Request:**
+```typescript
+{
+  "feedback_type": "positive" | "negative"
+}
+```
+
+**Response:**
+```typescript
+{
+  "success": true,
+  "data": {
+    "message": "Feedback recorded successfully"
+  }
+}
+```
+
+**Errors:**
+- `not_found`: Draft not found
+- `authorization_error`: Draft belongs to different user
+- `validation_error`: Invalid feedback type
 
 ## Rate Limits
 
-| Endpoint | Limit |
-|----------|-------|
-| `/auth/login` | 5 requests per minute |
-| `/auth/register` | 3 requests per minute |
-| `/drafts/generate` | 5 requests per minute |
-| `/style/upload` | 2 requests per hour |
-| All other endpoints | 100 requests per minute |
+Rate limits are enforced per user (authenticated endpoints) or per IP address (public endpoints).
+
+| Endpoint | Limit | Window | Headers |
+|----------|-------|--------|---------|
+| `/auth/login` | 5 requests | per minute | `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset` |
+| `/auth/register` | 3 requests | per minute | `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset` |
+| `/auth/reset-password` | 3 requests | per hour | `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset` |
+| `/drafts/generate` | 5 requests | per minute | `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset` |
+| `/style/upload` | 2 requests | per hour | `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset` |
+| `/style/posts/add` | 20 requests | per minute | `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset` |
+| `/feedback/{token}` | 10 requests | per minute | `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset` |
+| All other endpoints | 100 requests | per minute | `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset` |
+
+### Rate Limit Headers
+- `X-RateLimit-Limit`: Maximum number of requests allowed in the time window
+- `X-RateLimit-Remaining`: Number of requests remaining in the current window
+- `X-RateLimit-Reset`: Unix timestamp when the rate limit window resets
+
+### Rate Limit Exceeded Response
+```typescript
+{
+  "success": false,
+  "error": {
+    "error": "rate_limit_error",
+    "message": "Rate limit exceeded. Try again in 60 seconds.",
+    "details": {
+      "limit": 5,
+      "remaining": 0,
+      "reset": 1690876800
+    }
+  }
+}
+```
 
 ## Webhook Events (Future)
 
@@ -564,3 +682,300 @@ The mock API service includes:
 - Validation of request formats and business rules
 
 This ensures the frontend can be fully developed and tested before the backend is implemented.
+
+## Data Models and Validation Rules
+
+### User Model
+```typescript
+interface User {
+  id: string;                    // UUID v4
+  email: string;                 // Valid email format, unique
+  timezone: string;              // IANA timezone (e.g., "America/New_York")
+  delivery_time: string;         // Time in HH:MM:SS format (e.g., "08:00:00")
+  active: boolean;               // Account status
+  created_at: string;            // ISO 8601 timestamp
+  updated_at?: string;           // ISO 8601 timestamp
+}
+```
+
+**Validation Rules:**
+- `email`: Must be valid email format, unique across all users
+- `timezone`: Must be valid IANA timezone identifier
+- `delivery_time`: Must be in HH:MM:SS format (24-hour)
+- `active`: Defaults to true for new users
+
+### Source Model
+```typescript
+interface Source {
+  id: string;                    // UUID v4
+  user_id: string;               // Foreign key to User.id
+  type: 'rss' | 'twitter';       // Source type
+  url: string;                   // Source URL
+  name: string;                  // Display name
+  active: boolean;               // Whether to monitor this source
+  last_checked: string | null;   // ISO 8601 timestamp of last check
+  error_count: number;           // Number of consecutive errors
+  created_at: string;            // ISO 8601 timestamp
+  updated_at?: string;           // ISO 8601 timestamp
+  last_error?: string;           // Last error message (if any)
+}
+```
+
+**Validation Rules:**
+- `type`: Must be either "rss" or "twitter"
+- `url`: Must be valid URL format
+- `name`: 1-100 characters, required
+- `error_count`: Non-negative integer, defaults to 0
+- Maximum 20 sources per user
+
+### StylePost Model
+```typescript
+interface StylePost {
+  id: string;                    // UUID v4
+  user_id: string;               // Foreign key to User.id
+  content: string;               // Post content
+  processed: boolean;            // Whether embeddings have been generated
+  created_at: string;            // ISO 8601 timestamp
+  processed_at?: string;         // ISO 8601 timestamp when processed
+  word_count?: number;           // Number of words in content
+}
+```
+
+**Validation Rules:**
+- `content`: 50-3000 characters, required
+- `processed`: Defaults to false
+- Maximum 100 posts per user
+
+### Draft Model
+```typescript
+interface Draft {
+  id: string;                    // UUID v4
+  user_id: string;               // Foreign key to User.id
+  content: string;               // Generated post content
+  source_content_id: string | null; // Foreign key to SourceContent.id
+  status: 'pending' | 'approved' | 'rejected'; // Feedback status
+  feedback_token: string | null; // Unique token for email feedback
+  email_sent_at: string | null;  // ISO 8601 timestamp when email sent
+  created_at: string;            // ISO 8601 timestamp
+  updated_at?: string;           // ISO 8601 timestamp
+  source_name?: string;          // Display name of source (computed)
+  character_count?: number;      // Number of characters in content
+  engagement_score?: number;     // Predicted engagement score (0-10)
+}
+```
+
+**Validation Rules:**
+- `content`: 50-3000 characters, required
+- `status`: Defaults to "pending"
+- `feedback_token`: Must be unique across all drafts
+- `engagement_score`: Float between 0.0 and 10.0
+
+### SourceContent Model
+```typescript
+interface SourceContent {
+  id: string;                    // UUID v4
+  source_id: string;             // Foreign key to Source.id
+  title: string | null;          // Content title (if available)
+  content: string;               // Content text
+  url: string | null;            // Original content URL
+  published_at: string | null;   // ISO 8601 timestamp when published
+  processed: boolean;            // Whether used for draft generation
+  created_at: string;            // ISO 8601 timestamp
+}
+```
+
+**Validation Rules:**
+- `content`: 10-10000 characters, required
+- `processed`: Defaults to false
+- Content is automatically deduplicated by URL and content hash
+
+### Feedback Model
+```typescript
+interface Feedback {
+  id: string;                    // UUID v4
+  draft_id: string;              // Foreign key to Draft.id
+  feedback_type: 'positive' | 'negative'; // Feedback type
+  created_at: string;            // ISO 8601 timestamp
+}
+```
+
+**Validation Rules:**
+- `feedback_type`: Must be either "positive" or "negative"
+- One feedback record per draft (upsert behavior)
+
+## Database Schema Requirements
+
+### Indexes
+```sql
+-- Performance indexes
+CREATE INDEX idx_sources_user_id_active ON sources(user_id, active);
+CREATE INDEX idx_drafts_user_id_created_at ON drafts(user_id, created_at DESC);
+CREATE INDEX idx_style_posts_user_id_processed ON style_posts(user_id, processed);
+CREATE INDEX idx_source_content_source_id_processed ON source_content(source_id, processed);
+CREATE INDEX idx_feedback_draft_id ON feedback(draft_id);
+
+-- Unique constraints
+CREATE UNIQUE INDEX idx_drafts_feedback_token ON drafts(feedback_token) WHERE feedback_token IS NOT NULL;
+CREATE UNIQUE INDEX idx_users_email ON users(email);
+```
+
+### Vector Storage
+```sql
+-- Enable pg_vector extension
+CREATE EXTENSION IF NOT EXISTS vector;
+
+-- Style vectors table
+CREATE TABLE style_vectors (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    style_post_id UUID REFERENCES style_posts(id) ON DELETE CASCADE,
+    content TEXT NOT NULL,
+    embedding VECTOR(768), -- Gemini embedding dimension
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Vector similarity index
+CREATE INDEX style_vectors_embedding_idx ON style_vectors 
+USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+```
+
+### Row Level Security (RLS)
+```sql
+-- Enable RLS on all user tables
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sources ENABLE ROW LEVEL SECURITY;
+ALTER TABLE style_posts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE drafts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE style_vectors ENABLE ROW LEVEL SECURITY;
+
+-- RLS policies (users can only access their own data)
+CREATE POLICY users_policy ON users FOR ALL USING (auth.uid() = id);
+CREATE POLICY sources_policy ON sources FOR ALL USING (auth.uid() = user_id);
+CREATE POLICY style_posts_policy ON style_posts FOR ALL USING (auth.uid() = user_id);
+CREATE POLICY drafts_policy ON drafts FOR ALL USING (auth.uid() = user_id);
+CREATE POLICY style_vectors_policy ON style_vectors FOR ALL USING (auth.uid() = user_id);
+```
+
+## Background Job Requirements
+
+### Job Types
+1. **Content Fetching Jobs**
+   - `fetch_rss_content`: Fetch new content from RSS feeds
+   - `fetch_twitter_content`: Fetch new tweets from Twitter handles
+   - `check_source_health`: Monitor source availability
+
+2. **Processing Jobs**
+   - `process_style_posts`: Generate embeddings for style training posts
+   - `generate_daily_drafts`: Generate drafts for all active users
+   - `send_draft_emails`: Send draft emails to users
+
+3. **Maintenance Jobs**
+   - `cleanup_old_drafts`: Remove drafts older than 30 days
+   - `cleanup_processed_content`: Remove processed source content older than 7 days
+   - `update_source_health`: Update source error counts and status
+
+### Job Scheduling
+```python
+# Celery Beat schedule
+CELERY_BEAT_SCHEDULE = {
+    'fetch-rss-content': {
+        'task': 'tasks.fetch_rss_content',
+        'schedule': crontab(minute='*/30'),  # Every 30 minutes
+    },
+    'fetch-twitter-content': {
+        'task': 'tasks.fetch_twitter_content',
+        'schedule': crontab(minute='*/15'),  # Every 15 minutes
+    },
+    'generate-daily-drafts': {
+        'task': 'tasks.generate_daily_drafts',
+        'schedule': crontab(hour=6, minute=0),  # 6 AM UTC daily
+    },
+    'send-draft-emails': {
+        'task': 'tasks.send_draft_emails',
+        'schedule': crontab(minute='*/10'),  # Every 10 minutes
+    },
+    'cleanup-old-data': {
+        'task': 'tasks.cleanup_old_data',
+        'schedule': crontab(hour=2, minute=0),  # 2 AM UTC daily
+    },
+}
+```
+
+## External Service Integration Requirements
+
+### Gemini API Integration
+- **Endpoint**: `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent`
+- **Authentication**: API Key in header
+- **Rate Limits**: 60 requests per minute
+- **Use Cases**:
+  - Generate text embeddings for style training
+  - Generate LinkedIn post drafts using RAG
+  - Content quality filtering
+
+### SendGrid Integration
+- **Endpoint**: `https://api.sendgrid.com/v3/mail/send`
+- **Authentication**: Bearer token
+- **Rate Limits**: 100 emails per second
+- **Features Required**:
+  - HTML email templates
+  - Click tracking for feedback links
+  - Bounce and spam report handling
+  - Unsubscribe link management
+
+### Twitter API v2 Integration
+- **Endpoint**: `https://api.twitter.com/2/users/by/username/{username}/tweets`
+- **Authentication**: Bearer token
+- **Rate Limits**: 300 requests per 15 minutes
+- **Features Required**:
+  - Fetch recent tweets from username
+  - Filter out retweets and replies
+  - Handle rate limiting gracefully
+
+## Security Requirements
+
+### Authentication
+- JWT tokens with 24-hour expiration
+- Refresh token mechanism for seamless user experience
+- Secure password hashing using bcrypt (cost factor 12)
+- Email verification required for new accounts
+
+### Authorization
+- Row Level Security (RLS) for all user data
+- API endpoint authorization middleware
+- Feedback token validation for public endpoints
+
+### Data Protection
+- All sensitive data encrypted at rest
+- API requests over HTTPS only
+- Input validation and sanitization
+- SQL injection prevention
+- XSS protection for user-generated content
+
+### Rate Limiting
+- Per-user rate limiting for authenticated endpoints
+- Per-IP rate limiting for public endpoints
+- Exponential backoff for failed requests
+- Rate limit headers in responses
+
+## Monitoring and Logging Requirements
+
+### Metrics to Track
+- API response times (p50, p95, p99)
+- Error rates by endpoint
+- Background job success/failure rates
+- Email delivery rates
+- User engagement metrics (feedback rates)
+- External service API usage and errors
+
+### Logging Requirements
+- Structured logging (JSON format)
+- Request/response logging for debugging
+- Error logging with stack traces
+- Performance logging for slow queries
+- Security event logging (failed auth attempts)
+
+### Health Checks
+- `/health`: Basic health check
+- `/health/detailed`: Database, Redis, and external service connectivity
+- Background job queue health monitoring
+- Email delivery service health monitoring

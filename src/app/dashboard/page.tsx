@@ -4,6 +4,7 @@ import { useState } from 'react';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import Navigation from '@/components/layout/Navigation';
 import { DraftsList, GenerateDrafts } from '@/components/drafts';
+import { FeedbackAnalytics } from '@/components/feedback';
 import DashboardStats from '@/components/dashboard/DashboardStats';
 import Link from 'next/link';
 
@@ -119,8 +120,9 @@ export default function DashboardPage() {
             </div>
 
             {/* Stats Sidebar */}
-            <div className="lg:col-span-1">
+            <div className="lg:col-span-1 space-y-6">
               <DashboardStats />
+              <FeedbackAnalytics />
             </div>
           </div>
         </div>

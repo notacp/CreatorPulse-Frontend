@@ -10,6 +10,9 @@ export { default as ProtectedRoute, withAuth } from './auth/ProtectedRoute';
 // Draft Components
 export * from './drafts';
 
+// Feedback Components
+export * from './feedback';
+
 // Dashboard Components
 export { default as DashboardStats } from './dashboard/DashboardStats';
 

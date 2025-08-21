@@ -1,0 +1,1311 @@
+openapi: 3.0.3
+info:
+  title: CreatorPulse API
+  description: |
+    CreatorPulse Core MVP API for AI-powered LinkedIn content generation.
+    
+    This API provides endpoints for user authentication, content source management,
+    style training, draft generation, and feedback collection.
+  version: 1.0.0
+  contact:
+    name: CreatorPulse API Support
+    email: api-support@creatorpulse.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://api.creatorpulse.com/v1
+    description: Production server
+  - url: http://localhost:8000/v1
+    description: Development server
+
+security:
+  - BearerAuth: []
+
+paths:
+  # Authentication Endpoints
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: User login
+      description: Authenticate user with email and password
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Rate limit exceeded
+          headers:
+            X-RateLimit-Limit:
+              schema:
+                type: integer
+            X-RateLimit-Remaining:
+              schema:
+                type: integer
+            X-RateLimit-Reset:
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/register:
+    post:
+      tags:
+        - Authentication
+      summary: User registration
+      description: Register new user account
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Registration successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Invalid request or email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/logout:
+    post:
+      tags:
+        - Authentication
+      summary: User logout
+      description: Logout current user and invalidate token
+      responses:
+        '200':
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/reset-password:
+    post:
+      tags:
+        - Authentication
+      summary: Request password reset
+      description: Send password reset email to user
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordResetRequest'
+      responses:
+        '200':
+          description: Reset email sent (if email exists)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/verify-email:
+    get:
+      tags:
+        - Authentication
+      summary: Verify email address
+      description: Verify email address with verification token
+      security: []
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Email verification token
+      responses:
+        '200':
+          description: Email verified successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          description: Invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # Source Management Endpoints
+  /sources:
+    get:
+      tags:
+        - Sources
+      summary: Get user sources
+      description: Get all content sources for authenticated user
+      responses:
+        '200':
+          description: Sources retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SourcesResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      tags:
+        - Sources
+      summary: Create new source
+      description: Add new content source for monitoring
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSourceRequest'
+      responses:
+        '201':
+          description: Source created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SourceResponse'
+        '400':
+          description: Invalid request or URL not accessible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /sources/{id}:
+    put:
+      tags:
+        - Sources
+      summary: Update source
+      description: Update existing content source
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Source ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSourceRequest'
+      responses:
+        '200':
+          description: Source updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SourceResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Source not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags:
+        - Sources
+      summary: Delete source
+      description: Remove content source from monitoring
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Source ID
+      responses:
+        '200':
+          description: Source deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Source not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /sources/{id}/status:
+    get:
+      tags:
+        - Sources
+      summary: Get source status
+      description: Get health status of content source
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Source ID
+      responses:
+        '200':
+          description: Source status retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SourceStatusResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Source not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # Style Training Endpoints
+  /style/posts/add:
+    post:
+      tags:
+        - Style Training
+      summary: Add individual style post
+      description: Add single post for style training (incremental)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddStylePostRequest'
+      responses:
+        '201':
+          description: Style post added successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AddStylePostResponse'
+        '400':
+          description: Invalid content or user at maximum posts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /style/upload:
+    post:
+      tags:
+        - Style Training
+      summary: Upload style posts
+      description: Upload multiple posts for style training (bulk)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StyleTrainingRequest'
+      responses:
+        '202':
+          description: Style training started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StyleTrainingJobResponse'
+        '400':
+          description: Invalid posts or user at maximum posts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /style/status:
+    get:
+      tags:
+        - Style Training
+      summary: Get style training status
+      description: Get current status of style training process
+      parameters:
+        - name: job_id
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Specific job ID to check status for
+      responses:
+        '200':
+          description: Style training status retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StyleTrainingStatusResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /style/retrain:
+    post:
+      tags:
+        - Style Training
+      summary: Retrain style model
+      description: Retrain style model with existing posts
+      responses:
+        '202':
+          description: Style retraining started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StyleTrainingJobResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # Draft Management Endpoints
+  /drafts:
+    get:
+      tags:
+        - Drafts
+      summary: Get user drafts
+      description: Get paginated list of user drafts
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+          description: Page number
+        - name: per_page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+          description: Items per page
+      responses:
+        '200':
+          description: Drafts retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DraftsResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /drafts/generate:
+    post:
+      tags:
+        - Drafts
+      summary: Generate new drafts
+      description: Generate new LinkedIn post drafts based on recent content
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenerateDraftsRequest'
+      responses:
+        '201':
+          description: Drafts generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerateDraftsResponse'
+        '400':
+          description: No sources or insufficient style training
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /drafts/{id}:
+    get:
+      tags:
+        - Drafts
+      summary: Get specific draft
+      description: Get details of specific draft
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Draft ID
+      responses:
+        '200':
+          description: Draft retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DraftResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Draft not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /drafts/{id}/feedback:
+    put:
+      tags:
+        - Drafts
+      summary: Submit draft feedback
+      description: Submit feedback for specific draft (authenticated)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Draft ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeedbackRequest'
+      responses:
+        '200':
+          description: Feedback submitted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          description: Invalid feedback type
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Draft not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # User Settings Endpoints
+  /user/settings:
+    get:
+      tags:
+        - User Settings
+      summary: Get user settings
+      description: Get current user settings and preferences
+      responses:
+        '200':
+          description: Settings retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSettingsResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    put:
+      tags:
+        - User Settings
+      summary: Update user settings
+      description: Update user settings and preferences
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserSettingsRequest'
+      responses:
+        '200':
+          description: Settings updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSettingsResponse'
+        '400':
+          description: Invalid settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # Dashboard Endpoints
+  /dashboard/stats:
+    get:
+      tags:
+        - Dashboard
+      summary: Get dashboard statistics
+      description: Get user dashboard statistics and metrics
+      responses:
+        '200':
+          description: Statistics retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardStatsResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # Feedback Endpoints (Public)
+  /feedback/{token}:
+    post:
+      tags:
+        - Feedback
+      summary: Submit feedback via email token
+      description: Submit feedback using token from email (public endpoint)
+      security: []
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Feedback token from email
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeedbackRequest'
+      responses:
+        '200':
+          description: Feedback submitted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          description: Invalid feedback type
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    # Request Schemas
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          example: "user@example.com"
+        password:
+          type: string
+          minLength: 8
+          example: "password123"
+
+    RegisterRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          example: "user@example.com"
+        password:
+          type: string
+          minLength: 8
+          example: "password123"
+        timezone:
+          type: string
+          example: "America/New_York"
+          description: "IANA timezone identifier"
+
+    PasswordResetRequest:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+          example: "user@example.com"
+
+    CreateSourceRequest:
+      type: object
+      required:
+        - type
+        - url
+        - name
+      properties:
+        type:
+          type: string
+          enum: [rss, twitter]
+          example: "rss"
+        url:
+          type: string
+          format: uri
+          example: "https://techcrunch.com/feed/"
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          example: "TechCrunch"
+
+    UpdateSourceRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          example: "Updated Feed Name"
+        active:
+          type: boolean
+          example: false
+
+    AddStylePostRequest:
+      type: object
+      required:
+        - content
+      properties:
+        content:
+          type: string
+          minLength: 50
+          maxLength: 3000
+          example: "This is a sample LinkedIn post with enough content to meet the minimum character requirement for style training."
+
+    StyleTrainingRequest:
+      type: object
+      required:
+        - posts
+      properties:
+        posts:
+          type: array
+          items:
+            type: string
+            minLength: 50
+            maxLength: 3000
+          minItems: 1
+          maxItems: 100
+          example: 
+            - "Sample LinkedIn post 1..."
+            - "Sample LinkedIn post 2..."
+
+    GenerateDraftsRequest:
+      type: object
+      properties:
+        force:
+          type: boolean
+          default: false
+          description: "Force generation even if recent drafts exist"
+
+    FeedbackRequest:
+      type: object
+      required:
+        - feedback_type
+      properties:
+        feedback_type:
+          type: string
+          enum: [positive, negative]
+          example: "positive"
+
+    UpdateUserSettingsRequest:
+      type: object
+      properties:
+        timezone:
+          type: string
+          example: "Europe/London"
+          description: "IANA timezone identifier"
+        delivery_time:
+          type: string
+          pattern: "^([01]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$"
+          example: "09:00:00"
+          description: "Time in HH:MM:SS format"
+        email_notifications:
+          type: boolean
+          example: false
+
+    # Response Schemas
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        email:
+          type: string
+          format: email
+          example: "user@example.com"
+        timezone:
+          type: string
+          example: "America/New_York"
+        delivery_time:
+          type: string
+          example: "08:00:00"
+        active:
+          type: boolean
+          example: true
+        created_at:
+          type: string
+          format: date-time
+          example: "2024-01-15T10:00:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          example: "2024-01-15T10:00:00Z"
+
+    Source:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        user_id:
+          type: string
+          format: uuid
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        type:
+          type: string
+          enum: [rss, twitter]
+          example: "rss"
+        url:
+          type: string
+          format: uri
+          example: "https://techcrunch.com/feed/"
+        name:
+          type: string
+          example: "TechCrunch"
+        active:
+          type: boolean
+          example: true
+        last_checked:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2024-07-22T06:00:00Z"
+        error_count:
+          type: integer
+          minimum: 0
+          example: 0
+        created_at:
+          type: string
+          format: date-time
+          example: "2024-01-15T10:30:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          example: "2024-01-15T10:30:00Z"
+        last_error:
+          type: string
+          nullable: true
+          example: "Feed temporarily unavailable"
+
+    Draft:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        user_id:
+          type: string
+          format: uuid
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        content:
+          type: string
+          example: "LinkedIn post content..."
+        source_content_id:
+          type: string
+          format: uuid
+          nullable: true
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+          example: "pending"
+        feedback_token:
+          type: string
+          nullable: true
+          example: "feedback-token-123"
+        email_sent_at:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2024-07-22T08:00:00Z"
+        created_at:
+          type: string
+          format: date-time
+          example: "2024-07-22T07:45:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          example: "2024-07-22T07:45:00Z"
+        source_name:
+          type: string
+          example: "TechCrunch"
+        character_count:
+          type: integer
+          example: 280
+        engagement_score:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 10
+          example: 8.5
+
+    StyleTrainingStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [pending, processing, completed, failed]
+          example: "processing"
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+          example: 75
+        total_posts:
+          type: integer
+          minimum: 0
+          example: 20
+        processed_posts:
+          type: integer
+          minimum: 0
+          example: 15
+        message:
+          type: string
+          example: "Processing your writing style..."
+
+    UserSettings:
+      type: object
+      properties:
+        timezone:
+          type: string
+          example: "America/New_York"
+        delivery_time:
+          type: string
+          example: "08:00:00"
+        email_notifications:
+          type: boolean
+          example: true
+
+    DashboardStats:
+      type: object
+      properties:
+        total_drafts:
+          type: integer
+          example: 47
+        drafts_this_week:
+          type: integer
+          example: 5
+        positive_feedback:
+          type: integer
+          example: 28
+        negative_feedback:
+          type: integer
+          example: 12
+        feedback_rate:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          example: 0.85
+        active_sources:
+          type: integer
+          example: 3
+
+    PaginatedDrafts:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Draft'
+        total:
+          type: integer
+          example: 47
+        page:
+          type: integer
+          example: 1
+        per_page:
+          type: integer
+          example: 10
+        total_pages:
+          type: integer
+          example: 5
+
+    # Success Response Wrappers
+    AuthResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            user:
+              $ref: '#/components/schemas/User'
+            token:
+              type: string
+              example: "jwt-token-here"
+            expires_at:
+              type: string
+              format: date-time
+              example: "2024-07-23T08:00:00Z"
+
+    SourcesResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Source'
+
+    SourceResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/Source'
+
+    SourceStatusResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            status:
+              type: string
+              enum: [active, inactive, error]
+              example: "active"
+            last_error:
+              type: string
+              nullable: true
+              example: "Feed temporarily unavailable"
+
+    AddStylePostResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            message:
+              type: string
+              example: "Post added successfully"
+            post_id:
+              type: string
+              format: uuid
+              example: "123e4567-e89b-12d3-a456-426614174000"
+
+    StyleTrainingJobResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            message:
+              type: string
+              example: "Style training started"
+            job_id:
+              type: string
+              example: "style-job-123"
+
+    StyleTrainingStatusResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/StyleTrainingStatus'
+
+    DraftsResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/PaginatedDrafts'
+
+    DraftResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/Draft'
+
+    GenerateDraftsResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            message:
+              type: string
+              example: "Generated 4 new drafts"
+            drafts_generated:
+              type: integer
+              example: 4
+
+    UserSettingsResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/UserSettings'
+
+    DashboardStatsResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/DashboardStats'
+
+    MessageResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            message:
+              type: string
+              example: "Operation completed successfully"
+
+    # Error Response
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          properties:
+            error:
+              type: string
+              example: "validation_error"
+            message:
+              type: string
+              example: "Invalid input data"
+            details:
+              type: object
+              nullable: true
+              example: {}
+
+tags:
+  - name: Authentication
+    description: User authentication and account management
+  - name: Sources
+    description: Content source management (RSS feeds, Twitter handles)
+  - name: Style Training
+    description: AI style training with user's writing samples
+  - name: Drafts
+    description: AI-generated LinkedIn post drafts
+  - name: User Settings
+    description: User preferences and settings
+  - name: Dashboard
+    description: User dashboard and statistics
+  - name: Feedback
+    description: Draft feedback collection

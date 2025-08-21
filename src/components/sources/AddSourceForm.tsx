@@ -95,6 +95,7 @@ export default function AddSourceForm({ onSourceAdded, onCancel }: AddSourceForm
           <button
             onClick={onCancel}
             className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            aria-label="Close dialog"
           >
             <XMarkIcon className="w-6 h-6" />
           </button>
