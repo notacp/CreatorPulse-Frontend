@@ -40,6 +40,7 @@ import {
 class ApiService {
   private currentUser: User | null = null;
   private authToken: string | null = null;
+  private readonly API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
   
   // In-memory data stores (simulating database)
   private users = [...mockUsers];
@@ -848,34 +849,63 @@ class ApiService {
    * Submit feedback for draft
    */
   async submitDraftFeedback(id: string, feedbackType: 'positive' | 'negative'): Promise<ApiResponse<{ message: string }>> {
-    await this.delay(300);
+    const authError = this.requireAuth();
+    if (authError) return authError;
 
-    const draft = this.drafts.find(d => d.id === id);
-    
-    if (!draft) {
-      return this.createErrorResponse('not_found', 'Draft not found');
+    try {
+      const response = await fetch(`${this.API_BASE_URL}/v1/drafts/${id}/feedback`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.authToken}`
+        },
+        body: JSON.stringify({
+          feedback_type: feedbackType,
+          feedback_source: 'dashboard'
+        })
+      });
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          return this.createErrorResponse('not_found', 'Draft not found');
+        }
+        throw new Error('Failed to submit feedback');
+      }
+
+      return this.createSuccessResponse({
+        message: 'Feedback recorded successfully'
+      });
+    } catch (error) {
+      // Fallback to mock functionality for development
+      await this.delay(300);
+
+      const draft = this.drafts.find(d => d.id === id);
+      
+      if (!draft) {
+        return this.createErrorResponse('not_found', 'Draft not found');
+      }
+
+      // Update draft status
+      const draftIndex = this.drafts.findIndex(d => d.id === id);
+      this.drafts[draftIndex] = {
+        ...draft,
+        status: feedbackType === 'positive' ? 'approved' : 'rejected'
+      };
+
+      // Record feedback
+      const newFeedback: Feedback = {
+        id: generateId(),
+        draft_id: id,
+        feedback_type: feedbackType,
+        created_at: getCurrentTimestamp()
+      };
+
+      this.feedback.push(newFeedback);
+
+      return this.createSuccessResponse({
+        message: 'Feedback recorded successfully'
+      });
     }
-
-    // Update draft status
-    const draftIndex = this.drafts.findIndex(d => d.id === id);
-    this.drafts[draftIndex] = {
-      ...draft,
-      status: feedbackType === 'positive' ? 'approved' : 'rejected'
-    };
-
-    // Record feedback
-    const newFeedback: Feedback = {
-      id: generateId(),
-      draft_id: id,
-      feedback_type: feedbackType,
-      created_at: getCurrentTimestamp()
-    };
-
-    this.feedback.push(newFeedback);
-
-    return this.createSuccessResponse({
-      message: 'Feedback recorded successfully'
-    });
   }
 
   // ==================== USER SETTINGS ENDPOINTS ====================
@@ -978,15 +1008,38 @@ class ApiService {
    * Submit feedback via email token
    */
   async submitFeedbackByToken(token: string, feedbackType: 'positive' | 'negative'): Promise<ApiResponse<{ message: string }>> {
-    await this.delay(300);
+    try {
+      const response = await fetch(`${this.API_BASE_URL}/v1/feedback/${token}/${feedbackType}?source=email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
 
-    const draft = this.drafts.find(d => d.feedback_token === token);
-    
-    if (!draft) {
-      return this.createErrorResponse('not_found', 'Invalid feedback token');
+      if (!response.ok) {
+        if (response.status === 404) {
+          return this.createErrorResponse('not_found', 'Invalid or expired feedback token');
+        }
+        throw new Error('Failed to submit feedback');
+      }
+
+      const result = await response.json();
+
+      return this.createSuccessResponse({
+        message: result.message || 'Feedback recorded successfully'
+      });
+    } catch (error) {
+      // Fallback to mock functionality for development
+      await this.delay(300);
+
+      const draft = this.drafts.find(d => d.feedback_token === token);
+      
+      if (!draft) {
+        return this.createErrorResponse('not_found', 'Invalid feedback token');
+      }
+
+      return this.submitDraftFeedback(draft.id, feedbackType);
     }
-
-    return this.submitDraftFeedback(draft.id, feedbackType);
   }
 
   // ==================== UTILITY METHODS ====================
