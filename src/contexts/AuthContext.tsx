@@ -23,11 +23,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Check for existing auth state on mount
     const checkAuthState = () => {
-      const currentUser = apiService.getCurrentUser();
-      const isAuth = apiService.isAuthenticated();
-      console.log('AuthContext: checkAuthState', { currentUser, isAuth });
-      setUser(currentUser);
-      setIsLoading(false);
+      try {
+        const currentUser = apiService.getCurrentUser();
+        const isAuth = apiService.isAuthenticated();
+        console.log('AuthContext: checkAuthState', { currentUser, isAuth });
+        setUser(currentUser);
+      } catch (error) {
+        console.error('Error checking auth state:', error);
+        setUser(null);
+      } finally {
+        setIsLoading(false);
+      }
     };
 
     checkAuthState();
@@ -118,7 +124,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const isAuthenticated = !!user && apiService.isAuthenticated();
+  const isAuthenticated = !!user && (() => {
+    try {
+      return apiService.isAuthenticated();
+    } catch (error) {
+      console.error('Error checking authentication:', error);
+      return false;
+    }
+  })();
   console.log('AuthContext: render state', { user: !!user, isAuthenticated, isLoading });
 
   const value: AuthContextType = {
