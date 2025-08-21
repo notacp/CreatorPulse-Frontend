@@ -36,7 +36,12 @@ export default function DraftsList({
       const response = await apiService.getDrafts(page, perPage);
       
       if (response.success && response.data) {
-        let filteredDrafts = response.data.data;
+        let filteredDrafts = response.data.data || [];
+        
+        // Ensure filteredDrafts is an array
+        if (!Array.isArray(filteredDrafts)) {
+          filteredDrafts = [];
+        }
         
         // Apply status filter
         if (statusFilter !== 'all') {
@@ -44,12 +49,14 @@ export default function DraftsList({
         }
         
         setDrafts(filteredDrafts);
-        setTotalPages(response.data.total_pages);
+        setTotalPages(response.data.total_pages || 1);
       } else {
         setError(response.error?.message || 'Failed to fetch drafts');
+        setDrafts([]); // Ensure drafts is always an array
       }
     } catch (err) {
       setError('An unexpected error occurred');
+      setDrafts([]); // Ensure drafts is always an array
       console.error('Error fetching drafts:', err);
     } finally {
       setLoading(false);
@@ -184,7 +191,7 @@ export default function DraftsList({
       </div>
 
       {/* Drafts List */}
-      {drafts.length === 0 ? (
+      {!drafts || drafts.length === 0 ? (
         <div className="text-center py-12">
           <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -201,7 +208,7 @@ export default function DraftsList({
         </div>
       ) : (
         <div className="space-y-4">
-          {drafts.map((draft) => (
+          {drafts?.map((draft) => (
             <DraftCard
               key={draft.id}
               draft={draft}
