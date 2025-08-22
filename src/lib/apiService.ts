@@ -11,6 +11,7 @@ import {
   UpdateSourceRequest,
   StyleTrainingRequest,
   StyleTrainingStatus,
+  StylePost,
   GenerateDraftsRequest,
   UserSettings,
   DashboardStats,
@@ -788,8 +789,8 @@ class ApiService {
       }
       
       // Update local cache
-      const userStylePosts = stylePosts.filter(sp => sp.user_id === this.currentUser!.id);
-      this.stylePosts = [...this.stylePosts.filter(sp => sp.user_id !== this.currentUser!.id), ...userStylePosts];
+      const userStylePosts = stylePosts.filter((sp: StylePost) => sp.user_id === this.currentUser!.id);
+      this.stylePosts = [...this.stylePosts.filter((sp: StylePost) => sp.user_id !== this.currentUser!.id), ...userStylePosts];
       
       return this.createSuccessResponse(stylePosts);
 
