@@ -134,6 +134,7 @@ class ApiService {
   async login(request: LoginRequest): Promise<ApiResponse<AuthResponse>> {
     try {
       // Make real API call to backend
+      console.log('🔄 Calling backend API:', `${this.API_BASE_URL}/v1/auth/login`);
       const response = await fetch(`${this.API_BASE_URL}/v1/auth/login`, {
         method: 'POST',
         headers: {
@@ -144,22 +145,26 @@ class ApiService {
 
       if (!response.ok) {
         if (response.status === 401 || response.status === 403) {
+          console.log('🔐 Backend responded: Invalid credentials');
           return this.createErrorResponse('auth_error', 'Invalid email or password');
         }
         if (response.status === 422) {
           const errorData = await response.json();
+          console.log('📝 Backend validation error:', errorData);
           return this.createErrorResponse('validation_error', errorData.detail || 'Invalid input');
         }
         if (response.status === 429) {
+          console.log('⏰ Backend rate limit exceeded');
           return this.createErrorResponse('rate_limit_error', 'Too many login attempts. Please try again later.');
         }
+        console.log(`❌ Backend login failed with status: ${response.status}`);
         throw new Error(`Login failed with status: ${response.status}`);
       }
 
       const authData = await response.json();
       
       // Extract user and token from backend response structure
-      console.log('Login response:', authData);
+      console.log('✅ Successfully received login response from backend:', authData);
       
       if (!authData.data) {
         throw new Error('Invalid response format: missing data field');
@@ -198,7 +203,8 @@ class ApiService {
       });
 
     } catch (error) {
-      console.error('Login API error:', error);
+      console.error('❌ Login API error:', error);
+      console.log('🔄 Falling back to mock authentication');
       
       // Fallback to mock functionality for development
       await this.delay(800);
@@ -400,6 +406,7 @@ class ApiService {
 
     try {
       // Make real API call to backend
+      console.log('🔄 Calling backend API:', `${this.API_BASE_URL}/v1/sources`);
       const response = await fetch(`${this.API_BASE_URL}/v1/sources`, {
         method: 'GET',
         headers: {
@@ -410,13 +417,16 @@ class ApiService {
 
       if (!response.ok) {
         if (response.status === 401) {
+          console.log('🔐 Backend responded with 401 - clearing auth state');
           this.clearAuthState();
           return this.createErrorResponse('authentication_error', 'Authentication required');
         }
+        console.log(`❌ Backend responded with error: ${response.status}`);
         throw new Error(`Failed to fetch sources: ${response.status}`);
       }
 
       const result = await response.json();
+      console.log('✅ Successfully received data from backend:', result);
       
       // Handle different response formats from backend
       let sources = result;
@@ -429,10 +439,12 @@ class ApiService {
         sources = [];
       }
       
+      console.log('📊 Processed sources from backend:', sources.length, 'items');
       return this.createSuccessResponse(sources);
 
     } catch (error) {
-      console.error('Sources API error:', error);
+      console.error('❌ Sources API error:', error);
+      console.log('🔄 Falling back to mock data');
       
       // Fallback to mock functionality for development
       await this.delay(300);
@@ -759,6 +771,7 @@ class ApiService {
 
     try {
       // Make real API call to backend
+      console.log('🔄 Calling backend API:', `${this.API_BASE_URL}/v1/style/posts`);
       const response = await fetch(`${this.API_BASE_URL}/v1/style/posts`, {
         method: 'GET',
         headers: {
@@ -795,7 +808,8 @@ class ApiService {
       return this.createSuccessResponse(stylePosts);
 
     } catch (error) {
-      console.error('Get style posts API error:', error);
+      console.error('❌ Style posts API error:', error);
+      console.log('🔄 Falling back to mock data');
       
       // Fallback to mock functionality for development
       await this.delay(300);
