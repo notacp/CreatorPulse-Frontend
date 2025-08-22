@@ -19,6 +19,8 @@ export default function SourcesList({
   onSourceDeleted, 
   onRefresh 
 }: SourcesListProps) {
+  // Ensure sources is always an array
+  const safeSourcesArray = Array.isArray(sources) ? sources : [];
   const [editingSource, setEditingSource] = useState<Source | null>(null);
   const [deletingSource, setDeletingSource] = useState<Source | null>(null);
 
@@ -40,7 +42,7 @@ export default function SourcesList({
     setDeletingSource(null);
   };
 
-  if (sources.length === 0) {
+  if (safeSourcesArray.length === 0) {
     return (
       <div className="text-center py-12">
         <div className="mx-auto w-24 h-24 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
@@ -61,7 +63,7 @@ export default function SourcesList({
   return (
     <>
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {sources.map((source) => (
+        {safeSourcesArray.map((source) => (
           <SourceCard
             key={source.id}
             source={source}

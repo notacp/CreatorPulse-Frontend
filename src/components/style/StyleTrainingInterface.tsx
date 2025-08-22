@@ -405,7 +405,7 @@ export default function StyleTrainingInterface() {
           </div>
 
           <div className="space-y-4 max-h-96 overflow-y-auto">
-            {stylePosts.map((post) => (
+            {Array.isArray(stylePosts) && stylePosts.map((post) => (
               <div key={post.id} className="flex justify-between items-start p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
                 <div className="flex-1 mr-4">
                   <p className="text-sm text-gray-700 dark:text-gray-300 line-clamp-3">

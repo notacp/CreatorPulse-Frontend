@@ -36,10 +36,25 @@ export default function DraftsList({
       const response = await apiService.getDrafts(page, perPage);
       
       if (response.success && response.data) {
-        let filteredDrafts = response.data.data || [];
+        // Handle different response formats
+        let responseData = response.data;
+        
+        // If response.data is already an array, use it directly
+        if (Array.isArray(responseData)) {
+          responseData = {
+            data: responseData,
+            total: responseData.length,
+            page: currentPage,
+            per_page: perPage,
+            total_pages: Math.ceil(responseData.length / perPage)
+          };
+        }
+        
+        let filteredDrafts = responseData.data || [];
         
         // Ensure filteredDrafts is an array
         if (!Array.isArray(filteredDrafts)) {
+          console.warn('Drafts data is not an array:', filteredDrafts);
           filteredDrafts = [];
         }
         
@@ -49,7 +64,7 @@ export default function DraftsList({
         }
         
         setDrafts(filteredDrafts);
-        setTotalPages(response.data.total_pages || 1);
+        setTotalPages(responseData.total_pages || 1);
       } else {
         setError(response.error?.message || 'Failed to fetch drafts');
         setDrafts([]); // Ensure drafts is always an array

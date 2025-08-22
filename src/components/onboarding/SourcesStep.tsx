@@ -256,13 +256,13 @@ export default function SourcesStep({ onboardingData, updateOnboardingData, onNe
         </div>
 
         {/* Added Sources */}
-        {onboardingData.sources.length > 0 && (
+        {Array.isArray(onboardingData.sources) && onboardingData.sources.length > 0 && (
           <div>
             <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-              Your Sources ({onboardingData.sources.length})
+              Your Sources ({Array.isArray(onboardingData.sources) ? onboardingData.sources.length : 0})
             </h3>
             <div className="space-y-3">
-              {onboardingData.sources.map((source, index) => (
+              {Array.isArray(onboardingData.sources) && onboardingData.sources.map((source, index) => (
                 <div key={index} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
                   <div className="flex items-center">
                     {source.type === 'rss' ? (

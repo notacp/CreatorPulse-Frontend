@@ -23,7 +23,9 @@ export default function SourcesPage() {
       const response = await apiService.getSources();
       
       if (response.success && response.data) {
-        setSources(response.data);
+        // Ensure sources is always an array
+        const sourcesData = Array.isArray(response.data) ? response.data : [];
+        setSources(sourcesData);
       } else {
         setError(response.error?.message || 'Failed to load sources');
       }
@@ -40,18 +42,27 @@ export default function SourcesPage() {
   }, []);
 
   const handleSourceAdded = (newSource: Source) => {
-    setSources(prev => [...prev, newSource]);
+    setSources(prev => {
+      const currentSources = Array.isArray(prev) ? prev : [];
+      return [...currentSources, newSource];
+    });
     setShowAddForm(false);
   };
 
   const handleSourceUpdated = (updatedSource: Source) => {
-    setSources(prev => prev.map(source => 
-      source.id === updatedSource.id ? updatedSource : source
-    ));
+    setSources(prev => {
+      const currentSources = Array.isArray(prev) ? prev : [];
+      return currentSources.map(source => 
+        source.id === updatedSource.id ? updatedSource : source
+      );
+    });
   };
 
   const handleSourceDeleted = (deletedSourceId: string) => {
-    setSources(prev => prev.filter(source => source.id !== deletedSourceId));
+    setSources(prev => {
+      const currentSources = Array.isArray(prev) ? prev : [];
+      return currentSources.filter(source => source.id !== deletedSourceId);
+    });
   };
 
   if (loading) {

@@ -184,7 +184,7 @@ export default function StyleTrainingStep({ onboardingData, updateOnboardingData
             </div>
 
             <div className="space-y-3 max-h-64 overflow-y-auto">
-              {onboardingData.stylePosts.map((post, index) => (
+              {Array.isArray(onboardingData.stylePosts) && onboardingData.stylePosts.map((post, index) => (
                 <div key={index} className="flex justify-between items-start p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
                   <div className="flex-1 mr-4">
                     <p className="text-sm text-gray-700 dark:text-gray-300 line-clamp-2">

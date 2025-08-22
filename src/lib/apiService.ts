@@ -415,7 +415,19 @@ class ApiService {
         throw new Error(`Failed to fetch sources: ${response.status}`);
       }
 
-      const sources = await response.json();
+      const result = await response.json();
+      
+      // Handle different response formats from backend
+      let sources = result;
+      if (result.data) {
+        sources = result.data;
+      }
+      
+      // Ensure sources is always an array
+      if (!Array.isArray(sources)) {
+        sources = [];
+      }
+      
       return this.createSuccessResponse(sources);
 
     } catch (error) {
@@ -460,7 +472,18 @@ class ApiService {
         throw new Error(`Failed to create source: ${response.status}`);
       }
 
-      const newSource = await response.json();
+      const result = await response.json();
+      
+      // Handle different response formats from backend
+      let newSource = result;
+      if (result.data) {
+        newSource = result.data;
+      }
+      
+      // Validate source object
+      if (!newSource || typeof newSource !== 'object' || !newSource.id) {
+        throw new Error('Invalid source response format');
+      }
       
       // Update local cache for immediate UI update
       this.sources.push(newSource);
@@ -815,12 +838,29 @@ class ApiService {
 
       const result = await response.json();
       
-      // Update local cache
+      // Handle different response formats from backend
+      let responseData = result;
       if (result.data) {
-        this.drafts = [...result.data];
+        responseData = result.data;
       }
       
-      return this.createSuccessResponse(result);
+      // Ensure the data structure is consistent
+      if (responseData && !responseData.data) {
+        responseData = {
+          data: Array.isArray(responseData) ? responseData : [],
+          total: Array.isArray(responseData) ? responseData.length : 0,
+          page: 1,
+          per_page: perPage,
+          total_pages: 1
+        };
+      }
+      
+      // Update local cache
+      if (responseData.data && Array.isArray(responseData.data)) {
+        this.drafts = [...responseData.data];
+      }
+      
+      return this.createSuccessResponse(responseData);
 
     } catch (error) {
       console.error('Get drafts API error:', error);
