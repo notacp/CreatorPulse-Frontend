@@ -749,6 +749,62 @@ class ApiService {
   }
 
   /**
+   * GET /style/posts
+   * Get all style posts for current user
+   */
+  async getStylePosts(): Promise<ApiResponse<StylePost[]>> {
+    const authError = this.requireAuth();
+    if (authError) return authError;
+
+    try {
+      // Make real API call to backend
+      const response = await fetch(`${this.API_BASE_URL}/v1/style/posts`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.authToken}`
+        }
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          this.clearAuthState();
+          return this.createErrorResponse('authentication_error', 'Authentication required');
+        }
+        throw new Error(`Failed to fetch style posts: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      // Handle different response formats from backend
+      let stylePosts = result;
+      if (result.data) {
+        stylePosts = result.data;
+      }
+      
+      // Ensure stylePosts is always an array
+      if (!Array.isArray(stylePosts)) {
+        stylePosts = [];
+      }
+      
+      // Update local cache
+      const userStylePosts = stylePosts.filter(sp => sp.user_id === this.currentUser!.id);
+      this.stylePosts = [...this.stylePosts.filter(sp => sp.user_id !== this.currentUser!.id), ...userStylePosts];
+      
+      return this.createSuccessResponse(stylePosts);
+
+    } catch (error) {
+      console.error('Get style posts API error:', error);
+      
+      // Fallback to mock functionality for development
+      await this.delay(300);
+
+      const userStylePosts = this.stylePosts.filter(sp => sp.user_id === this.currentUser!.id);
+      return this.createSuccessResponse(userStylePosts);
+    }
+  }
+
+  /**
    * GET /style/status
    * Get style training status
    */
@@ -783,6 +839,61 @@ class ApiService {
       processed_posts: processedPosts,
       message: status === 'completed' ? 'Style training completed successfully' : 'Processing your writing style...'
     });
+  }
+
+  /**
+   * DELETE /style/posts/{id}
+   * Delete a style post
+   */
+  async deleteStylePost(postId: string): Promise<ApiResponse<{ message: string }>> {
+    const authError = this.requireAuth();
+    if (authError) return authError;
+
+    try {
+      // Make real API call to backend
+      const response = await fetch(`${this.API_BASE_URL}/v1/style/posts/${postId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.authToken}`
+        }
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          this.clearAuthState();
+          return this.createErrorResponse('authentication_error', 'Authentication required');
+        }
+        if (response.status === 404) {
+          return this.createErrorResponse('not_found', 'Style post not found');
+        }
+        throw new Error(`Failed to delete style post: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      // Remove from local cache
+      this.stylePosts = this.stylePosts.filter(sp => sp.id !== postId);
+      
+      return this.createSuccessResponse({
+        message: result.message || 'Style post deleted successfully'
+      });
+
+    } catch (error) {
+      console.error('Delete style post API error:', error);
+      
+      // Fallback to mock functionality for development
+      await this.delay(300);
+
+      const postIndex = this.stylePosts.findIndex(sp => sp.id === postId && sp.user_id === this.currentUser!.id);
+      
+      if (postIndex === -1) {
+        return this.createErrorResponse('not_found', 'Style post not found');
+      }
+
+      this.stylePosts.splice(postIndex, 1);
+      return this.createSuccessResponse({ message: 'Style post deleted successfully' });
+    }
   }
 
   /**

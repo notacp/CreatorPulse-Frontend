@@ -21,23 +21,25 @@ export default function StyleTrainingInterface() {
   const loadStyleData = async () => {
     setIsLoading(true);
     try {
-      // Load existing style posts (this would come from a real API endpoint)
-      // For now, we'll simulate this with the mock data
-      const statusResponse = await apiService.getStyleTrainingStatus();
+      // Load existing style posts from the backend
+      const [statusResponse, postsResponse] = await Promise.all([
+        apiService.getStyleTrainingStatus(),
+        apiService.getStylePosts()
+      ]);
+      
       if (statusResponse.success && statusResponse.data) {
         setTrainingStatus(statusResponse.data);
       }
       
-      // In a real implementation, we'd have an endpoint to get existing style posts
-      // For now, we'll use the mock data from the API service
-      const mockData = apiService.getMockData();
-      const currentUser = apiService.getCurrentUser();
-      if (currentUser) {
-        const userStylePosts = mockData.stylePosts.filter(sp => sp.user_id === currentUser.id);
-        setStylePosts(userStylePosts);
+      if (postsResponse.success && postsResponse.data) {
+        setStylePosts(Array.isArray(postsResponse.data) ? postsResponse.data : []);
+      } else {
+        console.error('Failed to load style posts:', postsResponse.error?.message);
+        setStylePosts([]);
       }
     } catch (err) {
       console.error('Error loading style data:', err);
+      setStylePosts([]);
     } finally {
       setIsLoading(false);
     }
@@ -73,7 +75,8 @@ export default function StyleTrainingInterface() {
     try {
       const response = await apiService.addStylePost(currentPost.trim());
       if (response.success) {
-        // Refresh the data to get the real post with proper ID
+        // Remove the temporary post and refresh data to get the real post
+        setStylePosts(prev => prev.filter(p => p.id !== newPost.id));
         await loadStyleData();
         // Show success message
         setErrors({ success: 'Post added successfully!' });
@@ -91,20 +94,21 @@ export default function StyleTrainingInterface() {
   };
 
   const removePost = async (postId: string) => {
-    // Remove from local state immediately
+    // Remove from local state immediately for better UX
     setStylePosts(prev => prev.filter(p => p.id !== postId));
     
-    // In a real implementation, we'd call an API to delete the post
-    // For now, we'll just update the mock data
     try {
-      const mockData = apiService.getMockData();
-      const postIndex = mockData.stylePosts.findIndex(p => p.id === postId);
-      if (postIndex !== -1) {
-        mockData.stylePosts.splice(postIndex, 1);
+      // Call the API service to delete the post
+      const response = await apiService.deleteStylePost(postId);
+      
+      if (!response.success) {
+        console.error('Failed to delete post:', response.error?.message);
+        // Reload data to ensure consistency if API call failed
+        await loadStyleData();
       }
     } catch (err) {
       console.error('Error removing post:', err);
-      // Reload data to ensure consistency
+      // Reload data to ensure consistency if API call failed
       await loadStyleData();
     }
   };
